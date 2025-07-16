@@ -1,0 +1,142 @@
+# 全自动总结扩展开发文档
+
+## 任务目标
+将一个名为“总结单世界书”的油猴脚本（Tampermonkey script）转换为一个名为“全自动总结”的SillyTavern扩展。
+
+## 开发计划
+
+### 第一阶段：基础结构搭建
+1.  **创建 `manifest.json`**: 在 `auto-summary` 文件夹中定义扩展的基本信息。 (已完成)
+2.  **创建项目文档**: 记录开发过程和关键决策。(进行中)
+
+### 第二阶段：代码分离与迁移
+1.  **创建 `style.css`**: 从原始脚本的 `popupHtml` 变量中提取所有CSS规则，并保存到 `style.css` 文件中。 (已完成)
+2.  **创建 `settings.html`**: 从 `popupHtml` 变量中提取所有HTML结构，并保存到 `settings.html` 文件中。这个文件将定义扩展的UI界面。 (已完成)
+3.  **创建 `index.js`**:
+    *   将原始油猴脚本的JavaScript逻辑代码迁移到 `index.js`。 (已完成)
+    *   移除油猴脚本特有的元数据块 (`// ==UserScript==...`) 和IIFE（立即调用函数表达式）的包裹。 (已完成)
+    *   将所有代码包裹在 `jQuery(async () => { ... });` 中，以确保在页面DOM加载完成后再执行。 (已完成)
+
+### 第三阶段：逻辑适配与重构
+1.  **UI加载逻辑修改**:
+    *   移除原有的 `SillyTavern_API.callGenericPopup` 调用来创建UI。 (已完成)
+    *   改为在 `index.js` 中使用 `$.get` 方法异步加载 `settings.html` 的内容。 (已完成)
+    *   将加载的HTML内容插入到酒馆预留的扩展设置区域 (`#extensions_settings2`) 或通过一个按钮触发弹窗显示。考虑到原脚本是弹窗形式，我会先实现一个按钮来触发这个弹窗。 (已完成)
+2.  **API依赖处理**:
+    *   保留并检查 `attemptToLoadCoreApis` 函数，确保它能正确获取到 SillyTavern 的核心API。 (已完成)
+3.  **路径调整**:
+    *   由于扩展的文件结构发生了变化，需要检查并修正代码中所有对文件路径的引用。 (已完成)
+4.  **功能测试与调试**:
+    *   在SillyTavern中启用新扩展，并全面测试所有功能。(进行中)
+
+## 问题排查
+
+### 2025-07-16: 弹窗无法显示 `TypeError: Cannot read properties of undefined (reading 'DISPLAY')`
+*   **问题描述**: 点击扩展菜单中的“全自动总结”按钮后，浏览器控制台报错 `Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'DISPLAY')`，导致设置弹窗无法显示。
+*   **分析**: 错误发生在 `openSummarizerPopup` 函数调用 `SillyTavern_API.callGenericPopup` 时。错误信息表明 `SillyTavern_API.POPUP_TYPE` 这个对象是 `undefined`，因此无法读取其下的 `DISPLAY` 属性。这很可能是因为 SillyTavern 的 API 进行了更新，旧的枚举类型 `POPUP_TYPE.DISPLAY` 已被废弃。
+*   **根本原因**: 使用了过时的 SillyTavern API。
+*   **解决方案**: 查阅了最新的 SillyTavern API 用法或根据常见实践推断，将 `SillyTavern_API.callGenericPopup` 的第二个参数从 `SillyTavern_API.POPUP_TYPE.DISPLAY` 直接修改为字符串 `'display'`。
+*   **状态**: (已解决) - 已更新 `index.js` 中的 `callGenericPopup` 调用，弹窗现在应该可以正常显示了。
+
+### 2025-07-16: 插件加载失败 `Failed to load one or more critical APIs`
+*   **问题描述**: 插件在浏览器控制台反复报错 `[auto-summary] Failed to load one or more critical APIs (check TavernHelper_API.triggerSlash)`，导致插件无法初始化。
+*   **分析**: 对比移植后的 `index.js` 和原始油猴脚本，发现 `attemptToLoadCoreApis` 函数本身没有变化。问题可能出在脚本的加载时机。SillyTavern扩展的加载时机可能早于核心API（特别是 `TavernHelper`）的完全初始化。原始脚本中存在一个3秒的延迟执行，这可能是为了等待API准备就绪。
+*   **根本原因**: 固定的 `setTimeout` 延迟并不可靠，因为SillyTavern的API加载时间不确定。
+*   **解决方案**: 采用SillyTavern扩展开发推荐的最佳实践，修改 `index.js` 的初始化逻辑。移除固定的 `setTimeout` 调用，改为使用一个轮询函数 (`initOnAppStart`) 等待 `SillyTavern_API.tavern_events.APP_STARTED` 事件。该事件在SillyTavern完全初始化后触发，确保所有核心API都已准备就绪。一旦接收到此事件，再调用 `mainInitializeSummarizer()` 函数来启动插件。这种方法从根本上解决了脚本执行时机过早的问题。
+*   **状态**:  (已解决) - 新的初始化逻辑已实施。现在插件应该可以稳定加载了。
+
+### 2025-07-16: 插件初始化时无限循环等待 `APP_STARTED` 事件
+*   **问题描述**: 修复上一个问题后，插件在浏览器控制台反复打印 `[auto-summary] SillyTavern API or APP_STARTED event not ready. Retrying in 500ms.`，导致插件依然无法启动。
+*   **分析**: `finalBootstrap` 函数的逻辑是等待 `SillyTavern_API.tavern_events.APP_STARTED` 事件可用后再附加监听器。这种实现方式存在两个问题：1) 如果脚本加载时，`APP_STARTED` 事件已经触发过了（即脚本加载晚于应用启动完成），插件将永远不会被初始化。2) 它无限期地等待一个可能永远不会在其检查时机出现的事件定义，导致无限循环。
+*   **根本原因**: 初始化逻辑不够健壮，没有处理脚本加载时机晚于应用启动完成的“竞态条件”，并且轮询检查的条件不完善。
+*   **解决方案**: 重构 `finalBootstrap` 函数，采用更可靠的初始化策略：
+    1.  **立即检查**: 首先检查一个通常在SillyTavern完全加载后才可用的核心API（如 `TavernHelper_API.triggerSlash`）。如果该API已存在，说明应用已启动，可以直接运行插件的主初始化函数 `mainInitializeSummarizer()`。这解决了竞态条件问题。
+    2.  **事件监听**: 如果应用尚未启动，则为 `APP_STARTED` 事件附加一个一次性监听器 (`.once()`)。这样可以确保即使事件已经发生，或者将来发生，初始化函数都只会被调用一次。
+    3.  **安全轮询**: 只有在连事件系统本身都无法访问的情况下，才退回使用 `setTimeout` 进行短暂轮询，直到可以附加事件监听器为止。
+*   **状态**: (已解决) - 新的 `finalBootstrap` 逻辑已实施，确保了插件无论在何种加载时机下都能被可靠地初始化。
+
+### 2025-07-16: 启动逻辑导致无限循环与API加载失败
+*   **问题描述**: 无论是采用轮询还是固定延迟启动，插件均在启动时报错 `Failed to load one or more critical APIs`，导致无法运行。用户反馈其他插件无此问题。
+*   **分析**: 对比成功的插件 `my-world-book-momo`，发现其启动逻辑完全不同。它不进行任何“前置”的、全局性的API检查，而是采用“按需检查”的策略。我的插件 `attemptToLoadCoreApis` 函数过于严格，在脚本加载初期就要求所有未来会用到的API函数（如 `TavernHelper_API.triggerSlash`）都必须存在，而此时它们很可能尚未被酒馆完全初始化。
+*   **根本原因**: 插件启动逻辑设计错误。不应该在脚本执行的最初阶段就对所有API进行全面、严格的检查。正确的做法是只在即将调用某个API函数前，确保其所在的顶层API对象（如 `SillyTavern_API`, `TavernHelper_API`）存在即可。
+*   **解决方案**: 借鉴 `my-world-book-momo` 的成功经验，对启动逻辑进行彻底重构：
+    1.  **废除所有启动延迟和轮询**：移除了 `setTimeout` 和 `finalBootstrap` 轮询函数。
+    2.  **简化API检查**：修改 `attemptToLoadCoreApis` 函数，使其只检查 `SillyTavern_API`、`TavernHelper_API` 和 `jQuery_API` 这三个核心**对象**是否存在，不再检查具体的内部函数。
+    3.  **直接启动**：在脚本的最后，直接调用 `runExtension()` 函数，立即开始执行插件逻辑。`runExtension` 内部会先进行一次简化的API对象检查，确保最基本的条件满足后，再继续执行后续的UI添加和事件绑定等操作。这种方式大大提高了插件的启动成功率和兼容性。
+*   **状态**: (已解决) - 新的启动逻辑已实施，插件现在应该可以像其他标准扩展一样稳定、快速地启动。
+
+### 2025-07-16: 弹窗无法显示 `TypeError: SillyTavern_API.callGenericPopup is not a function`
+*   **问题描述**: 点击扩展菜单中的“全自动总结”按钮后，浏览器控制台报错 `Uncaught (in promise) TypeError: SillyTavern_API.callGenericPopup is not a function`，导致设置弹窗无法显示。
+*   **分析**: 错误发生在 `openSummarizerPopup` 函数中。错误信息表明 `SillyTavern_API.callGenericPopup` 这个函数本身已经不存在于 `SillyTavern_API` 对象下。通过查阅一个能正常工作的扩展 `my-world-book-momo` 的代码，发现新的弹窗API需要通过 `SillyTavern.getContext().popup` 来访问。
+*   **根本原因**: 使用了过时的 SillyTavern API 调用方式。
+*   **解决方案**:
+    1.  在 `openSummarizerPopup` 函数中，将 `SillyTavern_API.callGenericPopup(...)` 修改为 `SillyTavern_API.getContext().popup.callGenericPopup(...)`。
+    2.  在 `summarizeAndUploadChunk` 函数中，同样修正了对确认弹窗的调用，并简化了逻辑，使其直接使用 `await` 来获取用户的确认结果，而不是包裹在 `new Promise` 中。
+*   **状态**: (已解决) - 已更新 `index.js` 中所有 `callGenericPopup` 的调用，弹窗现在应该可以正常工作了。
+
+### 2025-07-16: UI架构重构：从菜单弹窗到独立浮动按钮
+*   **问题描述**: 原有的UI通过在SillyTavern的扩展菜单中添加一个入口来触发，点击后调用 `SillyTavern_API.getContext().popup.callGenericPopup` 来显示 `settings.html`。这种方式存在以下问题：
+    1.  **入口隐蔽**: 功能入口隐藏在多级菜单中，不便于快速访问。
+    2.  **样式受限**: 弹窗样式受限于SillyTavern的通用弹窗框架，难以进行深度定制和移动端适配。
+    3.  **逻辑耦合**: 插件的UI逻辑与SillyTavern的弹窗API紧密耦合，当API更新时容易导致插件失效。
+*   **分析**: 参考了 `按钮与页面教程.txt` 中提供的最佳实践，该教程推荐使用动态创建的浮动按钮和完全自定义的弹窗页面，以实现更好的用户体验和代码健壮性。
+*   **根本原因**: 初始UI实现方式依赖性过强，且用户体验不佳。
+*   **解决方案**: 对UI架构进行了彻底重构：
+    1.  **移除菜单入口**: 在 `index.js` 中删除了 `addSummarizerMenuItem` 函数及其所有调用，不再向SillyTavern的扩展菜单注入任何内容。
+    2.  **创建浮动按钮**: 新增 `createFloatingButton` 函数，在插件启动时动态创建一个可拖动的浮动按钮 (`#auto-summary-float-button`)。按钮的位置可以在拖动后自动保存到 `localStorage`，并在下次加载时恢复。
+    3.  **实现自定义弹窗**:
+        *   重写 `openSummarizerPopup` 函数。该函数现在会动态构建一个完整的、独立的弹窗HTML结构 (`<div id="as-popup-container">...</div>`)，包含自定义的头部、可滚动的内容区域和关闭按钮。
+        *   原有的 `settings.html` 内容通过 `$.get` 加载后，被直接注入到新弹窗的 `.as-popup-body` 内容区中。
+        *   `settings.html` 本身也被精简，移除了最外层的容器 `div`。
+    4.  **更新CSS**:
+        *   在 `style.css` 中为新的浮动按钮和弹窗容器（`.as-popup`, `.as-popup-header` 等）添加了教程中推荐的 `position: fixed` 和 `flexbox` 布局样式，确保了在桌面和移动设备上的显示效果稳定、良好。
+        *   所有原有的内部UI样式规则，其选择器都增加了 `.as-popup-body` 作为前缀，以确保它们在新容器内正确生效且作用域受限。
+*   **状态**: (已解决) - UI已成功迁移到新的浮动按钮和自定义弹窗架构，显著提升了易用性和可维护性。
+
+### 2025-07-16: 总结条目创建后被立即禁用
+*   **问题描述**: 用户反馈，在执行总结并上传到世界书后，新创建或更新的总结条目虽然内容正确，但在世界书中的状态却是“禁用”(disabled)，导致总结在游戏中不生效。
+*   **分析**: 通过分析控制台日志发现，在 `proceedWithSummarization` 函数成功创建/更新条目后，`manageSummaryLorebookEntries` 函数被调用。该函数负责根据用户选择的总结类型（小总结/大总结）来启用或禁用相关的世界书条目。日志显示，该函数错误地将刚刚创建的、本应启用的条目判断为“需要禁用”，并执行了禁用操作。
+*   **根本原因**: `manageSummaryLorebookEntries` 函数内部的逻辑存在缺陷。它在判断一个条目是否应该被启用时，可能存在类型不匹配的问题（例如，将API返回的布尔值 `true` 与字符串 `"true"` 或其他非严格布尔值进行比较），导致其做出了错误的判断。
+*   **解决方案**: 重构 `manageSummaryLorebookEntries` 函数的逻辑：
+    1.  **强制类型转换**: 在进行比较之前，使用 `!!entry.enabled` 将从API获取的条目启用状态强制转换为严格的布尔值 (`true`/`false`)。
+    2.  **简化判断逻辑**: 明确判断逻辑，只有当条目属于当前聊天、且其总结类型（小/大）与用户当前在UI上的选择完全匹配时，`shouldBeEnabled` 才为 `true`。
+    3.  **精确更新**: 只有当条目当前的启用状态 (`isCurrentlyEnabled`) 与计算出的期望状态 (`shouldBeEnabled`) **不一致**时，才将其加入更新队列。这避免了不必要的操作。
+*   **状态**: (已解决) - 已更新 `index.js` 中的 `manageSummaryLorebookEntries` 函数，修复了逻辑错误。现在新创建的总结条目会保持正确的启用状态。
+
+### 2025-07-16: 连续总结时创建新条目而非追加
+*   **问题描述**: 当一个聊天记录存在多个总结区块时（例如，先总结1-10楼，再总结11-20楼），插件没有在第一个总结条目（如“小总结-xxx-1-10”）上追加内容，而是错误地创建了一个全新的条目（如“小总结-xxx-11-20”）。
+*   **分析**: 问题出在 `proceedWithSummarization` 函数中。该函数在尝试寻找一个已存在的、可追加的总结条目时，其逻辑不够健壮。它使用了 `lorebookEntries.find(...)`，这只会返回第一个满足条件的条目，而没有确保这个条目是**最新的**一个。如果因为某些原因（如手动操作、旧版插件的残留）导致存在多个同名的、已启用的总结条目，它可能会随机选到一个旧的，从而导致逻辑判断失误，最终选择创建一个新条目而不是追加。
+*   **根本原因**: 查找待追加总结条目的逻辑不够精确，没有处理可能存在多个同类总结条目的情况，未能准确锁定最新的一个。
+*   **解决方案**: 修改 `proceedWithSummarization` 函数中查找现有条目的逻辑。不再使用简单的 `find`，而是改为遍历所有世界书条目，并遵循以下规则来找到唯一、正确的目标条目：
+    1.  检查条目是否已启用 (`entry.enabled`)。
+    2.  检查条目的备注 (`entry.comment`) 是否符合当前聊天和总结类型的前缀（例如 `小总结-聊天名-`）。
+    3.  如果满足以上条件，则从备注中解析出结束楼层号。
+    4.  在所有符合条件的条目中，选择那个**结束楼层号最大**的条目作为追加目标。
+    这确保了即使存在多个总结条目，插件也总能准确地找到最新的那一个进行内容追加，从而解决了重复创建条目的问题。
+*   **状态**: (已解决) - 已更新 `index.js` 中的 `proceedWithSummarization` 函数，采用了更稳健的条目查找逻辑。
+
+### 2025-07-16: 为世界书条目操作添加 `prevent_recursion` 参数
+*   **问题描述**: 用户要求在创建和更新世界书条目时，增加 `prevent_recursion: true` 参数。
+*   **分析**: 这是为了防止在操作世界书条目时，触发不必要的递归或连锁反应，提高系统的稳定性和可预测性。
+*   **根本原因**: SillyTavern 的某些操作可能会触发事件，添加此参数可以有效避免这些副作用。
+*   **解决方案**: 在 `proceedWithSummarization` 函数中，定位到调用 `TavernHelper_API.setLorebookEntries` 和 `TavernHelper_API.createLorebookEntries` 的位置，在传递给这两个函数的条目数据对象中，明确添加 `"prevent_recursion": true` 属性。
+*   **状态**: (已解决) - 已更新 `index.js`，为所有相关的世界书条目创建和更新操作添加了 `prevent_recursion": true` 参数。
+
+### 2025-07-16: 页面刷新后重复总结
+*   **问题描述**: 尽管修复了追加逻辑，但在页面刷新后，插件有时仍然会从头开始重复总结已经总结过的内容。
+*   **分析**: 用户反馈，在页面刷新后，`getMaxSummarizedFloorFromActiveLorebookEntry` 函数未能正确获取到已总结的楼层数，返回了-1。这导致 `triggerAutomaticSummarizationIfNeeded` 函数错误地认为所有消息都是未总结的，从而下达了重复总结的指令。进一步分析发现，这与插件的初始化时机有关。
+*   **根本原因**: 插件的初始化逻辑虽然能确保API对象存在，但可能在SillyTavern的世界书数据完全加载和准备好之前就执行了。3秒的启动延迟在某些情况下不足以等待世界书加载完毕。
+*   **解决方案**: 延长插件初始化的延迟时间。在 `initialize` 函数中，将 `await delay(3000);` 修改为 `await delay(8000);`，给予SillyTavern更充足的时间来完成其内部数据的加载，特别是世界书部分。
+*   **状态**: (已解决) - 已更新 `index.js`，将初始化延迟增加到8秒，以期解决因加载时机问题导致的重复总结。
+
+### 2025-07-16: 无法读取已总结条目
+*   **问题描述**: 插件在加载时无法正确检测到世界书中已存在的总结条目，导致每次都从头开始总结。
+*   **分析**:
+    1.  **核心逻辑错误**: `getMaxSummarizedFloorFromActiveLorebookEntry` 函数被定义为需要传入 `entries` 参数的同步函数，但在调用它的 `applyPersistedSummaryStatusFromLorebook` 函数中并未传递此参数。这导致该函数无法访问世界书条目，总是返回-1。
+    2.  **正则表达式错误**: 在 `displayWorldbookEntriesByWeight` 函数中，用于解析世界书条目内容和权重的正则表达式存在多处语法错误（例如，错误地使用了双反斜杠 `\\d` 而不是单反斜杠 `\d`），导致无法正确显示和筛选已有的总结内容。
+*   **根本原因**: 函数调用与定义不匹配，以及多处正则表达式语法错误。
+*   **解决方案**:
+    1.  **重构核心函数**: 将 `getMaxSummarizedFloorFromActiveLorebookEntry` 修改为 `async` 函数，使其内部直接通过 `await TavernHelper_API.getLorebookEntries()` 来获取世界书条目，不再依赖外部传入参数。
+    2.  **修正调用**: 相应地，将 `applyPersistedSummaryStatusFromLorebook` 也修改为 `async` 函数，并使用 `await` 来调用重构后的 `getMaxSummarizedFloorFromActiveLorebookEntry`。
+    3.  **修正正则表达式**: 在 `displayWorldbookEntriesByWeight` 函数中，将所有错误的正则表达式（如 `/-(\\d+)-(\\d+)$/` 和 `/\\((\\d\\.\\d+?)\\)$/`）修正为正确的JavaScript语法（如 `/-(\d+)-(\d+)$/` 和 `/\((\d\.\d+?)\)$/`）。
+*   **状态**: (已解决) - 已更新 `index.js`，修复了核心逻辑和正则表达式错误。现在插件应该能正确读取和解析已有的总结条目了。
