@@ -144,10 +144,17 @@ jQuery(async () => {
     }
 
     function showToastr(type, message, options = {}) {
-        if (toastr_API) {
-            toastr_API[type](message, `全自动总结`, options);
+        // 根据用户反馈，只为 'error' 类型的消息显示弹窗，其他类型的消息（info, success, warning）仅记录到控制台。
+        if (type === 'error') {
+            if (toastr_API) {
+                toastr_API.error(message, `全自动总结`, options);
+            } else {
+                // Fallback for error if toastr is not available
+                logError(`Toastr (error): ${message}`);
+            }
         } else {
-            logDebug(`Toastr (${type}): ${message}`);
+            // For 'success', 'info', 'warning', just log it to the console.
+            logDebug(`Notification (${type}): ${message}`);
         }
     }
 
@@ -2712,36 +2719,14 @@ jQuery(async () => {
         }
 
         if (!lorebookToUploadTo) {
-            proceedToUpload = await SillyTavern_API.getContext().popup(
-                "未找到目标世界书，总结内容将不会上传。是否继续仅在本地总结（不上传）？",
-                "confirm",
-                "继续总结确认",
-                {
-                    buttons: [
-                        {
-                            label: "继续总结(不上传)",
-                            value: true,
-                            isAffirmative: true,
-                        },
-                        { label: "取消", value: false, isNegative: true },
-                    ],
-                },
-            );
-
-            if (proceedToUpload) {
-                logWarn(
-                    "No target lorebook, summary will not be uploaded, user chose to proceed.",
-                );
-            } else {
-                showToastr("info", "总结操作已取消。");
-                if ($popupInstance && $statusMessageSpan)
-                    $statusMessageSpan.text("总结操作已取消。");
-            }
+            // 根据用户反馈，移除确认弹窗。默认继续总结，但不会上传。
+            proceedToUpload = true;
+            logWarn("找不到目标世界书，总结内容将不会上传，但会继续在本地总结。");
         }
 
-        if (!proceedToUpload || !lorebookToUploadTo) {
-            if ($statusMessageSpan)
-                $statusMessageSpan.text("总结操作已取消或无目标世界书。");
+        // 如果用户（通过之前的弹窗，现已移除）取消了操作，则直接返回。
+        if (!proceedToUpload) {
+            if ($statusMessageSpan) $statusMessageSpan.text("总结操作已取消。");
             return false;
         }
 
