@@ -137,53 +137,6 @@
 .as-popup-body::-webkit-scrollbar { display: none; }
 .as-popup-body { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* --- 区块样式 --- */
-.as-section {
-    background-color: var(--as-section-bg-color);
-    border-radius: var(--as-border-radius);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.as-section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--as-border-color);
-    padding-bottom: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.as-section-header h3 {
-    margin: 0;
-    font-size: 1.1em;
-    color: var(--as-text-color);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.as-section-header .toggle-icon {
-    transition: transform 0.3s ease;
-}
-
-.as-section.collapsed .toggle-icon {
-    transform: rotate(-90deg);
-}
-
-.as-section-content {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.as-section.collapsed .as-section-content {
-    display: none;
-}
 
 /* --- 表单与控件样式 --- */
 .as-popup-body label {
@@ -333,4 +286,60 @@
 
 .hidden {
     display: none !important;
+}
+
+/* --- 开关样式 (为确保能正确显示而保留) --- */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #40444b;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: var(--as-primary-accent-color);
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px var(--as-primary-accent-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+.slider.round {
+    border-radius: 28px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
 }

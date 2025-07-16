@@ -20,6 +20,7 @@ jQuery(async () => {
     const STORAGE_KEY_VISIBILITY_OFFSET = `auto-summary_visibilityOffset_v1`;
     const STORAGE_KEY_UPLOAD_TARGET = `auto-summary_uploadTarget_v1`;
     const STORAGE_KEY_SELECTED_SUMMARY_PRESET = `auto-summary_selectedSummaryPreset_v1`;
+    const STORAGE_KEY_FLOATING_BUTTON_ENABLED = `auto-summary_floatingButtonEnabled_v1`; // 新增：悬浮按钮开关状态
     const NEW_MESSAGE_DEBOUNCE_DELAY = 4000;
     const POLLING_INTERVAL = 300000;
     const DEFAULT_VISIBILITY_OFFSET = 10;
@@ -128,6 +129,7 @@ jQuery(async () => {
     let uploadTargetSetting = DEFAULT_UPLOAD_TARGET;
     let currentVisibilityOffset = DEFAULT_VISIBILITY_OFFSET;
     let selectedSummaryPresetFile = null;
+    let isFloatingButtonEnabled = true; // 新增：悬浮按钮状态变量
 
     let newMessageDebounceTimer = null;
     let chatPollingIntervalId = null;
@@ -489,6 +491,17 @@ jQuery(async () => {
             logError("加载所选总结预设失败:", error);
             selectedSummaryPresetFile = null;
         }
+
+        try {
+            const savedState = localStorage.getItem(STORAGE_KEY_FLOATING_BUTTON_ENABLED);
+            // 默认启用，只有当明确保存为 'false' 时才禁用
+            isFloatingButtonEnabled = savedState !== 'false';
+            logDebug("悬浮按钮启用状态已加载:", isFloatingButtonEnabled);
+        } catch (error) {
+            logError("加载悬浮按钮启用状态失败:", error);
+            isFloatingButtonEnabled = true;
+        }
+
 
         if ($popupInstance) {
             if ($customApiUrlInput) $customApiUrlInput.val(customApiConfig.url);
@@ -1427,6 +1440,14 @@ jQuery(async () => {
                 left: "auto",
                 bottom: "auto",
             });
+        }
+    }
+
+    function destroyFloatingButton() {
+        const $button = jQuery_API("#auto-summary-float-button");
+        if ($button.length > 0) {
+            $button.remove();
+            logDebug("悬浮按钮已移除。");
         }
     }
 
@@ -3421,9 +3442,13 @@ jQuery(async () => {
     // --- 初始化 ---
     function startPlugin() {
         logDebug("SillyTavern APP_STARTED. Starting Summarizer Plugin logic.");
-        createFloatingButton();
-        handleWindowResize();
+        
         loadSettings();
+
+        if (isFloatingButtonEnabled) {
+            createFloatingButton();
+        }
+        handleWindowResize();
 
         if (
             SillyTavern_API &&
@@ -3505,6 +3530,37 @@ jQuery(async () => {
         if (!(await waitForCoreApis())) {
             return; // 如果API最终没有加载成功，则终止插件
         }
+
+        // 加载设置页面
+        try {
+            const settingsHtml = await jQuery_API.get(`${extensionFolderPath}/settings2.html`);
+            jQuery_API('#extensions_settings2').append(settingsHtml);
+
+            // 绑定设置页面的事件
+            const $toggle = jQuery_API('#auto-summary-enabled-toggle');
+            if ($toggle.length) {
+                // 加载保存的状态并更新UI
+                const savedState = localStorage.getItem(STORAGE_KEY_FLOATING_BUTTON_ENABLED);
+                isFloatingButtonEnabled = savedState !== 'false';
+                $toggle.prop('checked', isFloatingButtonEnabled);
+
+                // 绑定change事件
+                $toggle.on('change', function() {
+                    isFloatingButtonEnabled = jQuery_API(this).is(':checked');
+                    localStorage.setItem(STORAGE_KEY_FLOATING_BUTTON_ENABLED, isFloatingButtonEnabled);
+                    if (isFloatingButtonEnabled) {
+                        createFloatingButton();
+                        showToastr('info', '悬浮按钮已启用。');
+                    } else {
+                        destroyFloatingButton();
+                        showToastr('info', '悬浮按钮已禁用。');
+                    }
+                });
+            }
+        } catch (error) {
+            logError("加载 settings2.html 或绑定事件失败:", error);
+        }
+
 
         // 根据用户反馈增加8秒延迟
         logDebug("Waiting for 8 seconds before proceeding...");
