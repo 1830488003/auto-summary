@@ -3333,7 +3333,7 @@ jQuery(async () => {
                 );
 
                 const originalLinesArray =
-                    worldbookEntryCache.originalFullContent.split("\\n");
+                    worldbookEntryCache.originalFullContent.split("\n");
                 let linesToShowInTextarea = [];
                 worldbookEntryCache.displayedLinesInfo = [];
 
@@ -3390,7 +3390,7 @@ jQuery(async () => {
                         });
                     }
                 }
-                combinedContentForTextarea = linesToShowInTextarea.join("\\n");
+                combinedContentForTextarea = linesToShowInTextarea.join("\n");
                 worldbookEntryCache.isFilteredView = !(
                     minWeight === 0.0 &&
                     maxWeight === 1.0 &&
