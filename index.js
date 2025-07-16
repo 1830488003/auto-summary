@@ -21,6 +21,8 @@ jQuery(async () => {
     const STORAGE_KEY_UPLOAD_TARGET = `auto-summary_uploadTarget_v1`;
     const STORAGE_KEY_SELECTED_SUMMARY_PRESET = `auto-summary_selectedSummaryPreset_v1`;
     const STORAGE_KEY_FLOATING_BUTTON_ENABLED = `auto-summary_floatingButtonEnabled_v1`; // 新增：悬浮按钮开关状态
+    const STORAGE_KEY_COMPRESSION_BATCH_SIZE = `auto-summary_compressionBatchSize_v1`;
+    const STORAGE_KEY_COMPRESSION_PROMPT = `auto-summary_compressionPrompt_v1`;
     const NEW_MESSAGE_DEBOUNCE_DELAY = 4000;
     const POLLING_INTERVAL = 300000;
     const DEFAULT_VISIBILITY_OFFSET = 10;
@@ -98,7 +100,12 @@ jQuery(async () => {
         $visibilityOffsetInput,
         $saveVisibilityOffsetButton,
         $uploadTargetCurrentRadio,
-        $uploadTargetSummaryRadio;
+        $uploadTargetSummaryRadio,
+        $compressionSettingsToggle,
+        $compressionSettingsAreaDiv,
+        $compressionBatchSizeInput,
+        $compressionPromptTextarea,
+        $executeCompressionButton;
 
     let currentlyDisplayedEntryDetails = {
         uid: null,
@@ -130,6 +137,8 @@ jQuery(async () => {
     let currentVisibilityOffset = DEFAULT_VISIBILITY_OFFSET;
     let selectedSummaryPresetFile = null;
     let isFloatingButtonEnabled = true; // 新增：悬浮按钮状态变量
+    let compressionBatchSize = 5;
+    let compressionPrompt = "请将以下多个总结报告融合成一个连贯、精简的摘要...";
 
     let newMessageDebounceTimer = null;
     let chatPollingIntervalId = null;
@@ -147,7 +156,7 @@ jQuery(async () => {
 
     function showToastr(type, message, options = {}) {
         // 根据用户反馈，只为 'error' 类型的消息显示弹窗，其他类型的消息（info, success, warning）仅记录到控制台。
-        if (type === 'error') {
+        if (type === "error") {
             if (toastr_API) {
                 toastr_API.error(message, `全自动总结`, options);
             } else {
@@ -493,15 +502,36 @@ jQuery(async () => {
         }
 
         try {
-            const savedState = localStorage.getItem(STORAGE_KEY_FLOATING_BUTTON_ENABLED);
+            const savedState = localStorage.getItem(
+                STORAGE_KEY_FLOATING_BUTTON_ENABLED,
+            );
             // 默认启用，只有当明确保存为 'false' 时才禁用
-            isFloatingButtonEnabled = savedState !== 'false';
+            isFloatingButtonEnabled = savedState !== "false";
             logDebug("悬浮按钮启用状态已加载:", isFloatingButtonEnabled);
         } catch (error) {
             logError("加载悬浮按钮启用状态失败:", error);
             isFloatingButtonEnabled = true;
         }
 
+        try {
+            const savedBatchSize = localStorage.getItem(
+                STORAGE_KEY_COMPRESSION_BATCH_SIZE,
+            );
+            if (savedBatchSize) {
+                const parsedSize = parseInt(savedBatchSize, 10);
+                if (!isNaN(parsedSize) && parsedSize > 0) {
+                    compressionBatchSize = parsedSize;
+                }
+            }
+            const savedPrompt = localStorage.getItem(
+                STORAGE_KEY_COMPRESSION_PROMPT,
+            );
+            if (savedPrompt && savedPrompt.trim()) {
+                compressionPrompt = savedPrompt;
+            }
+        } catch (error) {
+            logError("加载压缩设置失败:", error);
+        }
 
         if ($popupInstance) {
             if ($customApiUrlInput) $customApiUrlInput.val(customApiConfig.url);
@@ -541,6 +571,11 @@ jQuery(async () => {
             updateSummaryTypeSelectionUI();
             if (typeof updateAdvancedHideUIDisplay === "function")
                 updateAdvancedHideUIDisplay();
+
+            if ($compressionBatchSizeInput)
+                $compressionBatchSizeInput.val(compressionBatchSize);
+            if ($compressionPromptTextarea)
+                $compressionPromptTextarea.val(compressionPrompt);
         }
     }
 
@@ -1247,6 +1282,7 @@ jQuery(async () => {
         logDebug(
             "Resetting script state for summarizer. Attempting to get chat name via /getchatname command...",
         );
+
         allChatMessages = [];
         currentPrimaryLorebook = null;
         let chatNameFromCommand = null;
@@ -1318,6 +1354,8 @@ jQuery(async () => {
             currentPrimaryLorebook = null;
         }
 
+        // 在确定了世界书和聊天标识后，执行迁移
+        await migrateOldSummaryEntries();
         await applyPersistedSummaryStatusFromLorebook();
 
         if ($popupInstance) {
@@ -1803,6 +1841,22 @@ jQuery(async () => {
             `#chatSummarizerWorldbookAdv-upload-target-summary`,
         );
 
+        $compressionSettingsToggle = $popupInstance.find(
+            `#chatSummarizerWorldbookAdv-compression-settings-toggle`,
+        );
+        $compressionSettingsAreaDiv = $popupInstance.find(
+            `#chatSummarizerWorldbookAdv-compression-settings-area-div`,
+        );
+        $compressionBatchSizeInput = $popupInstance.find(
+            `#chatSummarizerWorldbookAdv-compression-batch-size`,
+        );
+        $compressionPromptTextarea = $popupInstance.find(
+            `#chatSummarizerWorldbookAdv-compression-prompt-textarea`,
+        );
+        $executeCompressionButton = $popupInstance.find(
+            `#chatSummarizerWorldbookAdv-execute-compression`,
+        );
+
         if ($customApiUrlInput) $customApiUrlInput.val(customApiConfig.url);
         if ($customApiKeyInput) $customApiKeyInput.val(customApiConfig.apiKey);
         if ($customApiModelSelect) {
@@ -1850,6 +1904,11 @@ jQuery(async () => {
             $autoSummaryEnabledCheckbox.prop("checked", autoSummaryEnabled);
         if ($visibilityOffsetInput)
             $visibilityOffsetInput.val(currentVisibilityOffset);
+
+        if ($compressionBatchSizeInput)
+            $compressionBatchSizeInput.val(compressionBatchSize);
+        if ($compressionPromptTextarea)
+            $compressionPromptTextarea.val(compressionPrompt);
 
         updateApiStatusDisplay();
 
@@ -2062,15 +2121,52 @@ jQuery(async () => {
                 .addClass("active-filter");
         }
 
+        if ($executeCompressionButton && $executeCompressionButton.length) {
+            $executeCompressionButton.on("click", executeCompression);
+        }
+
+        if ($compressionBatchSizeInput && $compressionBatchSizeInput.length) {
+            $compressionBatchSizeInput.on("change", function () {
+                const newSize = parseInt(jQuery_API(this).val(), 10);
+                if (!isNaN(newSize) && newSize > 0) {
+                    compressionBatchSize = newSize;
+                    localStorage.setItem(
+                        STORAGE_KEY_COMPRESSION_BATCH_SIZE,
+                        compressionBatchSize,
+                    );
+                    showToastr(
+                        "info",
+                        `压缩单元数量已更新为: ${compressionBatchSize}`,
+                    );
+                }
+            });
+        }
+
+        if ($compressionPromptTextarea && $compressionPromptTextarea.length) {
+            $compressionPromptTextarea.on("change", function () {
+                compressionPrompt = jQuery_API(this).val();
+                localStorage.setItem(
+                    STORAGE_KEY_COMPRESSION_PROMPT,
+                    compressionPrompt,
+                );
+                showToastr("info", `压缩提示词已更新。`);
+            });
+        }
+
         if ($worldbookClearButton && $worldbookClearButton.length) {
-            $worldbookClearButton.on('click', function() {
+            $worldbookClearButton.on("click", function () {
                 if ($worldbookContentDisplayTextArea) {
                     // 核心操作：将文本框的值设置为空字符串
-                    $worldbookContentDisplayTextArea.val(''); 
-                    
-                    showToastr("info", "内容显示区已清空。点击“保存修改”以更新世界书。");
-                    
-                    logDebug("Worldbook display textarea cleared by user. Click 'Save' to commit.");
+                    $worldbookContentDisplayTextArea.val("");
+
+                    showToastr(
+                        "info",
+                        "内容显示区已清空。点击“保存修改”以更新世界书。",
+                    );
+
+                    logDebug(
+                        "Worldbook display textarea cleared by user. Click 'Save' to commit.",
+                    );
                 }
             });
         }
@@ -2742,7 +2838,9 @@ jQuery(async () => {
         if (!lorebookToUploadTo) {
             // 根据用户反馈，移除确认弹窗。默认继续总结，但不会上传。
             proceedToUpload = true;
-            logWarn("找不到目标世界书，总结内容将不会上传，但会继续在本地总结。");
+            logWarn(
+                "找不到目标世界书，总结内容将不会上传，但会继续在本地总结。",
+            );
         }
 
         // 如果用户（通过之前的弹窗，现已移除）取消了操作，则直接返回。
@@ -2931,6 +3029,334 @@ jQuery(async () => {
             throw new Error("自定义API响应格式不正确或未返回内容。");
         }
     }
+    async function executeCompression() {
+        logDebug("executeCompression: 开始执行总结压缩流程。");
+        if (isAutoSummarizing) {
+            showToastr("warning", "正在进行其他总结任务，请稍后再试。");
+            return;
+        }
+        if (!coreApisAreReady || !TavernHelper_API) {
+            showToastr("error", "无法执行压缩：核心API未就绪。");
+            return;
+        }
+
+        const targetLorebook =
+            uploadTargetSetting === "summary"
+                ? SUMMARY_LOREBOOK_NAME
+                : currentPrimaryLorebook;
+
+        if (!targetLorebook) {
+            showToastr("error", "无法执行压缩：未找到目标世界书。");
+            return;
+        }
+
+        if (!customApiConfig.url || !customApiConfig.model) {
+            showToastr("error", "无法执行压缩：请先配置并保存API设置。");
+            return;
+        }
+        if (
+            !currentChatFileIdentifier ||
+            currentChatFileIdentifier.startsWith("unknown_chat")
+        ) {
+            showToastr("error", "无法执行压缩：未能识别当前聊天。");
+            return;
+        }
+
+        isAutoSummarizing = true; // 使用相同的标志来防止并发操作
+        if ($executeCompressionButton)
+            $executeCompressionButton.prop("disabled", true).text("压缩中...");
+        if ($statusMessageSpan)
+            $statusMessageSpan.text("正在查找需要压缩的总结条目...");
+
+        try {
+            const allEntries =
+                await TavernHelper_API.getLorebookEntries(targetLorebook);
+            const relevantPrefix =
+                selectedSummaryType === "small"
+                    ? SUMMARY_LOREBOOK_SMALL_PREFIX
+                    : SUMMARY_LOREBOOK_LARGE_PREFIX;
+            const chatSpecificPrefix =
+                relevantPrefix + currentChatFileIdentifier + "-";
+
+            let entryToCompress = null;
+            let latestEndDate = -1;
+
+            // 查找最新的、已启用的、未被压缩存档的总结条目
+            for (const entry of allEntries) {
+                if (
+                    entry.enabled &&
+                    entry.comment &&
+                    entry.comment.startsWith(chatSpecificPrefix) &&
+                    !entry.comment.startsWith("[已压缩存档]")
+                ) {
+                    const match = entry.comment.match(/-(\d+)-(\d+)$/);
+                    if (match) {
+                        const entryEndDate = parseInt(match[2], 10);
+                        if (
+                            !isNaN(entryEndDate) &&
+                            entryEndDate > latestEndDate
+                        ) {
+                            latestEndDate = entryEndDate;
+                            entryToCompress = entry;
+                        }
+                    }
+                }
+            }
+
+            if (!entryToCompress) {
+                throw new Error("没有找到当前聊天对应的、可供压缩的总结条目。");
+            }
+
+            logDebug(
+                `找到待压缩条目: "${entryToCompress.comment}" (UID: ${entryToCompress.uid})`,
+            );
+            if ($statusMessageSpan)
+                $statusMessageSpan.text("已找到条目，正在解析总结单元...");
+
+            // 从内容中剥离引导头
+            const contentWithoutIntro = (entryToCompress.content || "")
+                .replace(INTRODUCTORY_TEXT_FOR_LOREBOOK, "")
+                .trim();
+
+            const summaryBlockRegex =
+                /【第\d+次总结】\s*\([\s\S]*?\):\s*[\s\S]*?(?=(?:\n\n|^)\[?【第\d+次总结】|$)/g;
+            const summaryBlocks =
+                contentWithoutIntro.match(summaryBlockRegex) || [];
+
+            if (summaryBlocks.length === 0) {
+                throw new Error(
+                    `在条目 "${entryToCompress.comment}" 中没有找到格式正确的总结单元。`,
+                );
+            }
+
+            logDebug(`解析出 ${summaryBlocks.length} 个总结单元。`);
+            if ($statusMessageSpan)
+                $statusMessageSpan.text(
+                    `找到 ${summaryBlocks.length} 个总结单元，准备分批压缩...`,
+                );
+
+            const batchSize = compressionBatchSize;
+            let allCompressedText = [];
+
+            for (let i = 0; i < summaryBlocks.length; i += batchSize) {
+                const batch = summaryBlocks.slice(i, i + batchSize);
+                const currentBatchNumber = Math.floor(i / batchSize) + 1;
+                const totalBatches = Math.ceil(
+                    summaryBlocks.length / batchSize,
+                );
+
+                const statusText = `正在压缩第 ${currentBatchNumber} / ${totalBatches} 批...`;
+                logDebug(statusText);
+                if ($statusMessageSpan) $statusMessageSpan.text(statusText);
+
+                const contentForBatch = batch.join("\n\n");
+                const userPromptForCompression = `${compressionPrompt}\n\n---\n${contentForBatch}`;
+
+                const compressedResult = await callCustomOpenAI(
+                    null,
+                    userPromptForCompression,
+                );
+                allCompressedText.push(compressedResult);
+
+                await delay(1000); // API调用之间短暂延迟
+            }
+
+            const finalCompressedContent = allCompressedText.join("\n\n");
+            logDebug(
+                "所有批次压缩完成。最终内容长度:",
+                finalCompressedContent.length,
+            );
+            if ($statusMessageSpan)
+                $statusMessageSpan.text("压缩完成，正在更新世界书...");
+
+            // 1. 归档旧条目
+            const archivedEntryName = `[已压缩存档] ${entryToCompress.comment}`;
+            const archiveUpdate = {
+                uid: entryToCompress.uid,
+                comment: archivedEntryName,
+                enabled: false,
+            };
+            await TavernHelper_API.setLorebookEntries(targetLorebook, [
+                archiveUpdate,
+            ]);
+            logDebug(
+                `旧条目 (UID: ${entryToCompress.uid}) 已重命名为 "${archivedEntryName}" 并禁用。`,
+            );
+
+            // 2. 创建新条目
+            const newEntryData = {
+                comment: entryToCompress.comment, // 使用原始名称
+                content:
+                    INTRODUCTORY_TEXT_FOR_LOREBOOK +
+                    "\n\n" +
+                    finalCompressedContent,
+                keys: entryToCompress.keys,
+                enabled: true,
+                type: entryToCompress.type || "constant",
+                position:
+                    entryToCompress.position || "before_character_definition",
+                order: (entryToCompress.order || Date.now()) + 1,
+                prevent_recursion: true,
+            };
+
+            const creationResult = await TavernHelper_API.createLorebookEntries(
+                targetLorebook,
+                [newEntryData],
+            );
+            if (
+                !creationResult ||
+                !creationResult.new_uids ||
+                creationResult.new_uids.length === 0
+            ) {
+                // 回滚归档操作
+                await TavernHelper_API.setLorebookEntries(targetLorebook, [
+                    {
+                        uid: entryToCompress.uid,
+                        comment: entryToCompress.comment,
+                        enabled: true,
+                    },
+                ]);
+                throw new Error(
+                    "创建新的压缩总结条目失败，API未返回新UID。旧条目已尝试恢复。",
+                );
+            }
+
+            logDebug(
+                `成功创建新的压缩总结条目，UID: ${creationResult.new_uids[0]}`,
+            );
+            showToastr("success", "总结压缩成功！旧条目已存档，新条目已激活。");
+            if ($statusMessageSpan) $statusMessageSpan.text("总结压缩成功！");
+
+            // 刷新UI
+            await displayWorldbookEntriesByWeight(0.0, 1.0);
+        } catch (error) {
+            logError("执行总结压缩时出错:", error);
+            showToastr("error", `压缩失败: ${error.message}`);
+            if ($statusMessageSpan)
+                $statusMessageSpan.text(`错误: ${error.message}`);
+        } finally {
+            isAutoSummarizing = false;
+            if ($executeCompressionButton)
+                $executeCompressionButton
+                    .prop("disabled", false)
+                    .text("执行压缩");
+        }
+    }
+
+    async function migrateOldSummaryEntries() {
+        const targetLorebook =
+            uploadTargetSetting === "summary"
+                ? SUMMARY_LOREBOOK_NAME
+                : currentPrimaryLorebook;
+        if (
+            !targetLorebook ||
+            !currentChatFileIdentifier ||
+            currentChatFileIdentifier.startsWith("unknown_chat")
+        ) {
+            return; // Not ready to migrate
+        }
+
+        logDebug(
+            `[Migration] Checking for old summary formats in "${targetLorebook}" for chat "${currentChatFileIdentifier}"...`,
+        );
+
+        try {
+            const allEntries =
+                await TavernHelper_API.getLorebookEntries(targetLorebook);
+            const entriesToUpdate = [];
+
+            const relevantPrefix =
+                selectedSummaryType === "small"
+                    ? SUMMARY_LOREBOOK_SMALL_PREFIX
+                    : SUMMARY_LOREBOOK_LARGE_PREFIX;
+            const chatSpecificPrefix =
+                relevantPrefix + currentChatFileIdentifier + "-";
+
+            for (const entry of allEntries) {
+                // Find relevant, enabled, non-archived entries for the current chat
+                if (
+                    entry.enabled &&
+                    entry.comment &&
+                    entry.comment.startsWith(chatSpecificPrefix) &&
+                    !entry.comment.startsWith("[已压缩存档]")
+                ) {
+                    let content = entry.content || "";
+                    const hasNewFormat = /【第\d+次总结】/.test(content);
+                    const isPotentiallyOldSingleBlock =
+                        content.startsWith(INTRODUCTORY_TEXT_FOR_LOREBOOK) &&
+                        content.length >
+                            INTRODUCTORY_TEXT_FOR_LOREBOOK.length + 10;
+                    const needsMigration =
+                        !hasNewFormat &&
+                        (content.includes("【追加总结】") ||
+                            isPotentiallyOldSingleBlock);
+
+                    if (needsMigration) {
+                        logWarn(
+                            `[Migration] Found old format entry: "${entry.comment}". Starting migration...`,
+                        );
+
+                        let contentToMigrate = content
+                            .replace(INTRODUCTORY_TEXT_FOR_LOREBOOK, "")
+                            .trim();
+
+                        // Split content by the old delimiter. This gives an array of summary blocks.
+                        const summaryBlocks =
+                            contentToMigrate.split("【追加总结】");
+
+                        const migratedBlocks = summaryBlocks
+                            .map((block, index) => {
+                                const trimmedBlock = block.trim();
+                                if (trimmedBlock) {
+                                    // Prepend the new numbered marker to each block
+                                    return `【第${index + 1}次总结】\n${trimmedBlock}`;
+                                }
+                                return null;
+                            })
+                            .filter(Boolean); // Remove any empty blocks that might result from splitting
+
+                        if (migratedBlocks.length > 0) {
+                            const newContentBody = migratedBlocks.join("\n\n");
+                            const finalContent =
+                                INTRODUCTORY_TEXT_FOR_LOREBOOK +
+                                "\n\n" +
+                                newContentBody;
+
+                            // Push the whole updated entry object for saving
+                            entriesToUpdate.push({
+                                ...entry,
+                                content: finalContent,
+                            });
+
+                            logWarn(
+                                `[Migration] Entry "${entry.comment}" has been prepared for migration.`,
+                            );
+                        }
+                    }
+                }
+            }
+
+            if (entriesToUpdate.length > 0) {
+                await TavernHelper_API.setLorebookEntries(
+                    targetLorebook,
+                    entriesToUpdate,
+                );
+                logWarn(
+                    `[Migration] Successfully saved ${entriesToUpdate.length} migrated entries to "${targetLorebook}".`,
+                );
+            } else {
+                logDebug(
+                    "[Migration] No old format entries found that require migration.",
+                );
+            }
+        } catch (error) {
+            logError(
+                "[Migration] Error during summary format migration:",
+                error,
+            );
+        }
+    }
+
     async function proceedWithSummarization(
         startInternalId,
         endInternalId,
@@ -3048,9 +3474,16 @@ jQuery(async () => {
                         );
                     }
 
+                    const existingContent = entryToAppendTo.content || "";
+                    const summaryBlockRegex = /【(?:追加|第\d+次)总结】/g;
+                    const existingSummariesCount = (
+                        existingContent.match(summaryBlockRegex) || []
+                    ).length;
+                    const newSummaryNumber = existingSummariesCount + 1;
+
                     finalContentForLorebook =
-                        entryToAppendTo.content +
-                        `\n\n【追加总结】(${floorRangeText}):\n` +
+                        existingContent +
+                        `\n\n【第${newSummaryNumber}次总结】(${floorRangeText}):\n` +
                         summaryText;
                     finalEntryName = `${currentSummaryPrefix}${chatIdentifier}-${combinedStartFloorDisplay}-${combinedEndFloorDisplay}`;
 
@@ -3087,7 +3520,9 @@ jQuery(async () => {
                     // 创建新条目模式
                     logDebug(`未找到可追加的总结条目，将创建新条目。`);
                     finalContentForLorebook =
-                        INTRODUCTORY_TEXT_FOR_LOREBOOK + "\n\n" + summaryText;
+                        INTRODUCTORY_TEXT_FOR_LOREBOOK +
+                        `\n\n【第1次总结】(${floorRangeText}):\n` +
+                        summaryText;
                     finalEntryName = `${currentSummaryPrefix}${chatIdentifier}-${combinedStartFloorDisplay}-${combinedEndFloorDisplay}`;
                     const entryData = {
                         comment: finalEntryName,
@@ -3442,7 +3877,7 @@ jQuery(async () => {
     // --- 初始化 ---
     function startPlugin() {
         logDebug("SillyTavern APP_STARTED. Starting Summarizer Plugin logic.");
-        
+
         loadSettings();
 
         if (isFloatingButtonEnabled) {
@@ -3533,34 +3968,40 @@ jQuery(async () => {
 
         // 加载设置页面
         try {
-            const settingsHtml = await jQuery_API.get(`${extensionFolderPath}/settings2.html`);
-            jQuery_API('#extensions_settings2').append(settingsHtml);
+            const settingsHtml = await jQuery_API.get(
+                `${extensionFolderPath}/settings2.html`,
+            );
+            jQuery_API("#extensions_settings2").append(settingsHtml);
 
             // 绑定设置页面的事件
-            const $toggle = jQuery_API('#auto-summary-enabled-toggle');
+            const $toggle = jQuery_API("#auto-summary-enabled-toggle");
             if ($toggle.length) {
                 // 加载保存的状态并更新UI
-                const savedState = localStorage.getItem(STORAGE_KEY_FLOATING_BUTTON_ENABLED);
-                isFloatingButtonEnabled = savedState !== 'false';
-                $toggle.prop('checked', isFloatingButtonEnabled);
+                const savedState = localStorage.getItem(
+                    STORAGE_KEY_FLOATING_BUTTON_ENABLED,
+                );
+                isFloatingButtonEnabled = savedState !== "false";
+                $toggle.prop("checked", isFloatingButtonEnabled);
 
                 // 绑定change事件
-                $toggle.on('change', function() {
-                    isFloatingButtonEnabled = jQuery_API(this).is(':checked');
-                    localStorage.setItem(STORAGE_KEY_FLOATING_BUTTON_ENABLED, isFloatingButtonEnabled);
+                $toggle.on("change", function () {
+                    isFloatingButtonEnabled = jQuery_API(this).is(":checked");
+                    localStorage.setItem(
+                        STORAGE_KEY_FLOATING_BUTTON_ENABLED,
+                        isFloatingButtonEnabled,
+                    );
                     if (isFloatingButtonEnabled) {
                         createFloatingButton();
-                        showToastr('info', '悬浮按钮已启用。');
+                        showToastr("info", "悬浮按钮已启用。");
                     } else {
                         destroyFloatingButton();
-                        showToastr('info', '悬浮按钮已禁用。');
+                        showToastr("info", "悬浮按钮已禁用。");
                     }
                 });
             }
         } catch (error) {
             logError("加载 settings2.html 或绑定事件失败:", error);
         }
-
 
         // 根据用户反馈增加8秒延迟
         logDebug("Waiting for 8 seconds before proceeding...");
