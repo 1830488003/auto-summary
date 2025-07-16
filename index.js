@@ -1427,22 +1427,21 @@ jQuery(async () => {
         let isDragging = false;
         let hasMoved = false;
         let offset = { x: 0, y: 0 };
-        let startPos = { x: 0, y: 0 }; // Store start position
+        let startPos = { x: 0, y: 0 };
 
         const dragStart = (e) => {
             isDragging = true;
             hasMoved = false;
             button.css("cursor", "grabbing");
+
             const event =
                 e.type === "touchstart" ? e.originalEvent.touches[0] : e;
             const buttonPos = button.offset();
             offset.x = event.pageX - buttonPos.left;
             offset.y = event.pageY - buttonPos.top;
 
-            startPos.x = event.pageX; // Store initial event position
+            startPos.x = event.pageX;
             startPos.y = event.pageY;
-
-            e.preventDefault();
         };
 
         const dragMove = (e) => {
@@ -1451,7 +1450,6 @@ jQuery(async () => {
             const event =
                 e.type === "touchmove" ? e.originalEvent.touches[0] : e;
 
-            // Check for movement threshold before setting hasMoved
             if (!hasMoved) {
                 if (
                     Math.abs(event.pageX - startPos.x) > 5 ||
@@ -1461,32 +1459,31 @@ jQuery(async () => {
                 }
             }
 
-            // Only move if it's a confirmed drag
-            if (!hasMoved) {
-                return;
+            if (hasMoved) {
+                e.preventDefault();
+
+                const buttonWidth = button.outerWidth();
+                const buttonHeight = button.outerHeight();
+                const windowWidth = jQuery_API(window).width();
+                const windowHeight = jQuery_API(window).height();
+
+                let newLeft = event.pageX - offset.x;
+                let newTop = event.pageY - offset.y;
+
+                if (newLeft < 0) newLeft = 0;
+                if (newTop < 0) newTop = 0;
+                if (newLeft + buttonWidth > windowWidth)
+                    newLeft = windowWidth - buttonWidth;
+                if (newTop + buttonHeight > windowHeight)
+                    newTop = windowHeight - buttonHeight;
+
+                button.css({
+                    top: newTop + "px",
+                    left: newLeft + "px",
+                    right: "auto",
+                    bottom: "auto",
+                });
             }
-
-            const buttonWidth = button.outerWidth();
-            const buttonHeight = button.outerHeight();
-            const windowWidth = jQuery_API(window).width();
-            const windowHeight = jQuery_API(window).height();
-
-            let newLeft = event.pageX - offset.x;
-            let newTop = event.pageY - offset.y;
-
-            if (newLeft < 0) newLeft = 0;
-            if (newTop < 0) newTop = 0;
-            if (newLeft + buttonWidth > windowWidth)
-                newLeft = windowWidth - buttonWidth;
-            if (newTop + buttonHeight > windowHeight)
-                newTop = windowHeight - buttonHeight;
-
-            button.css({
-                top: newTop + "px",
-                left: newLeft + "px",
-                right: "auto",
-                bottom: "auto",
-            });
         };
 
         const dragEnd = () => {
