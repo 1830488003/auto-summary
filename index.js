@@ -2035,11 +2035,14 @@ jQuery(async () => {
         }
 
         if ($worldbookClearButton && $worldbookClearButton.length) {
-            $worldbookClearButton.on("click", function () {
+            $worldbookClearButton.on('click', function() {
                 if ($worldbookContentDisplayTextArea) {
-                    $worldbookContentDisplayTextArea.val("");
-                    showToastr("info", "世界书内容显示区已清空。");
-                    logDebug("Worldbook display textarea cleared by user.");
+                    // 核心操作：将文本框的值设置为空字符串
+                    $worldbookContentDisplayTextArea.val(''); 
+                    
+                    showToastr("info", "内容显示区已清空。点击“保存修改”以更新世界书。");
+                    
+                    logDebug("Worldbook display textarea cleared by user. Click 'Save' to commit.");
                 }
             });
         }
@@ -2074,9 +2077,9 @@ jQuery(async () => {
                 if (worldbookEntryCache.isFilteredView) {
                     logDebug("Saving a filtered view.");
                     const modifiedFilteredLinesArray =
-                        newContentFromTextarea.split("\\n");
+                        newContentFromTextarea.split("\n");
                     let fullContentLinesCopy =
-                        worldbookEntryCache.originalFullContent.split("\\n");
+                        worldbookEntryCache.originalFullContent.split("\n");
 
                     if (newContentFromTextarea.trim() === "") {
                         logDebug(
@@ -2093,7 +2096,7 @@ jQuery(async () => {
                                 linesToKeep.push(fullContentLinesCopy[i]);
                             }
                         }
-                        newContentToSave = linesToKeep.join("\\n");
+                        newContentToSave = linesToKeep.join("\n");
                         showToastr(
                             "info",
                             "已从世界书条目中移除筛选出的并被清空的内容。",
@@ -2134,7 +2137,7 @@ jQuery(async () => {
                                 );
                             }
                         }
-                        newContentToSave = fullContentLinesCopy.join("\\n");
+                        newContentToSave = fullContentLinesCopy.join("\n");
                     }
                 } else {
                     logDebug(
@@ -2709,11 +2712,9 @@ jQuery(async () => {
         }
 
         if (!lorebookToUploadTo) {
-            const { POPUP_TYPE, callGenericPopup } =
-                SillyTavern_API.getContext().popup;
-            proceedToUpload = await callGenericPopup(
+            proceedToUpload = await SillyTavern_API.getContext().popup(
                 "未找到目标世界书，总结内容将不会上传。是否继续仅在本地总结（不上传）？",
-                POPUP_TYPE.CONFIRM,
+                "confirm",
                 "继续总结确认",
                 {
                     buttons: [
@@ -3335,32 +3336,23 @@ jQuery(async () => {
                 const originalLinesArray =
                     worldbookEntryCache.originalFullContent.split("\n");
                 let linesToShowInTextarea = [];
+                // 重置缓存
                 worldbookEntryCache.displayedLinesInfo = [];
 
                 const weightRegex = /\((\d\.\d+?)\)$/;
+                const isShowAllMode = minWeight === 0.0 && maxWeight === 1.0;
 
                 for (let i = 0; i < originalLinesArray.length; i++) {
                     const line = originalLinesArray[i];
                     const trimmedLine = line.trim();
-                    const isSummaryEventLine = /^\d+\..*\((\d\.\d+?)\)$/.test(
-                        trimmedLine,
-                    );
-                    const isTimeMarkerOrSeparator =
-                        !isSummaryEventLine &&
-                        !trimmedLine.includes("【追加总结】") &&
-                        !trimmedLine.includes("【剧情总结参考指南】") &&
-                        !trimmedLine.includes("---") &&
-                        trimmedLine.length > 0 &&
-                        trimmedLine.length < 50 &&
-                        !trimmedLine.match(/\((\d\.\d+?)\)/);
-                    const isSpecialGuideText =
-                        trimmedLine.includes("【追加总结】") ||
-                        trimmedLine.includes("【剧情总结参考指南】") ||
-                        trimmedLine.includes("---");
 
                     let shouldDisplayThisLine = false;
 
-                    if (isSummaryEventLine) {
+                    if (isShowAllMode) {
+                        // 在“显示全部”模式下，显示所有行
+                        shouldDisplayThisLine = true;
+                    } else {
+                        // 在筛选模式下，只显示符合权重范围的事件行
                         const weightMatch = trimmedLine.match(weightRegex);
                         if (weightMatch && weightMatch[1]) {
                             const weight = parseFloat(weightMatch[1]);
@@ -3372,33 +3364,22 @@ jQuery(async () => {
                                 shouldDisplayThisLine = true;
                             }
                         }
-                    } else if (minWeight === 0.0 && maxWeight === 1.0) {
-                        if (
-                            trimmedLine === "" ||
-                            isSpecialGuideText ||
-                            isTimeMarkerOrSeparator
-                        ) {
-                            shouldDisplayThisLine = true;
-                        }
+                        // 非事件行（如空行、标题）在筛选模式下不显示
                     }
 
                     if (shouldDisplayThisLine) {
                         linesToShowInTextarea.push(line);
+                        // 关键：无论如何，只要行被显示，就记录它的原始信息
                         worldbookEntryCache.displayedLinesInfo.push({
                             originalLineText: line,
                             originalLineIndex: i,
                         });
                     }
                 }
+
                 combinedContentForTextarea = linesToShowInTextarea.join("\n");
-                worldbookEntryCache.isFilteredView = !(
-                    minWeight === 0.0 &&
-                    maxWeight === 1.0 &&
-                    linesToShowInTextarea.length ===
-                        originalLinesArray.length &&
-                    worldbookEntryCache.displayedLinesInfo.length ===
-                        originalLinesArray.length
-                );
+                // 只要不是“显示全部”模式，就标记为筛选视图
+                worldbookEntryCache.isFilteredView = !isShowAllMode;
                 logDebug(
                     `displayWorldbookEntriesByWeight: isFilteredView set to ${worldbookEntryCache.isFilteredView}. Displayed lines: ${worldbookEntryCache.displayedLinesInfo.length}, Original lines: ${originalLinesArray.length}`,
                 );

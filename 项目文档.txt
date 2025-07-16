@@ -233,3 +233,34 @@
 *   **根本原因**: 拖动检测逻辑对于移动端触摸操作过于敏感，没有区分“微小移动的点击”和“真正的拖动”意图。
 *   **解决方案**: 参考 `按钮与页面教程.txt` 的最佳实践，对 `makeButtonDraggable` 函数进行优化。在 `dragStart` 事件中记录初始触摸位置，然后在 `dragMove` 事件中，增加一个5像素的容错阈值。只有当手指的移动距离（水平或垂直）超过这个阈值时，才将 `hasMoved` 标志设置为 `true`。这样可以有效地忽略点击时产生的微小抖动，确保单击操作能够被正确识别和执行。
 *   **状态**: (已解决) - 已更新 `index.js` 中的 `makeButtonDraggable` 函数，增加了拖动容错阈值，解决了移动端的点击问题。
+
+### 2025-07-16: “清空全部”按钮功能调整
+*   **问题描述**: “清空全部”按钮会删除当前聊天在世界书中的所有总结条目，而不是用户期望的、仅删除当前筛选出的权重范围内的条目。
+*   **分析**: 按钮的事件监听器逻辑错误，它被设计为清空整个条目，而非根据UI的筛选条件进行部分删除。
+*   **根本原因**: 对用户需求的理解有偏差，功能实现与预期不符。
+*   **解决方案**: 重写了 `worldbookClearButton` 的 `click` 事件处理函数：
+    1.  **获取当前筛选范围**: 从 `worldbookEntryCache` 中获取当前激活的 `minWeight` 和 `maxWeight`。
+    2.  **精确确认**: 弹窗提示用户，明确告知将要删除的是哪个权重区间的内容。
+    3.  **按行处理**: 读取缓存中的原始条目内容，逐行解析。
+    4.  **条件删除**: 只有当一行的内容是总结事件，并且其权重值正好落在当前筛选区间内时，才将其舍弃。其他所有行（包括不在区间内的事件、标题、分隔符等）都被保留。
+    5.  **更新条目**: 用保留下的行重组新的内容，并调用 `TavernHelper_API.setLorebookEntries` 更新世界书条目。
+    6.  **刷新视图**: 操作完成后，使用相同的筛选条件刷新显示区域，让用户能立刻看到结果。
+*   **状态**: (已解决) - “清空全部”按钮现在可以精确地删除用户通过权重按钮筛选出的内容。
+
+### 2025-07-16: 修复弹窗API调用错误
+*   **问题描述**: 在执行“清空筛选内容”等需要弹窗确认的操作时，浏览器控制台报错 `TypeError: Cannot destructure property 'callGenericPopup' of 'SillyTavern_API.getContext(...).popup' as it is undefined`。
+*   **分析**: 之前为了修复一个弹窗问题，将调用方式修改为 `SillyTavern_API.getContext().popup.callGenericPopup`，但这种解构赋值的方式在某些场景下依然不稳定。错误日志表明 `SillyTavern_API.getContext().popup` 这个对象本身是 `undefined`。
+*   **根本原因**: 对 SillyTavern 弹窗API的调用方式理解不完全，`getContext()` 返回的对象本身就是弹窗函数，不应该再尝试访问其下的 `popup` 属性。
+*   **解决方案**: 修改 `index.js` 中所有调用确认弹窗的地方，将 `const { callGenericPopup } = SillyTavern_API.getContext().popup; await callGenericPopup(...)` 的模式，直接改为 `await SillyTavern_API.getContext().popup(...)`。这确保了使用正确的API句柄来调用弹窗。
+*   **状态**: (已解决) - 已修正所有相关弹窗的调用方式，现在功能应该可以正常使用了。
+
+### 2025-07-16: 修复按权重删除功能
+*   **问题描述**: 在筛选特定权重范围的事件后，清空文本框并保存，并不能完全删除这些事件，条目中仍会残留空行或标题。
+*   **分析**: 根据用户提供的教程，问题根源在于 `displayWorldbookEntriesByWeight` 函数。该函数在构建 `worldbookEntryCache` 时，只缓存了符合权重条件的事件行，而忽略了空行、标题等非事件行。这导致保存逻辑在重构内容时，由于信息不完整，无法正确地移除所有被显示的内容。
+*   **根本原因**: `worldbookEntryCache` 的构建逻辑与教程描述的“读取-筛选-编辑-重构-覆盖”流程不符，未能建立一个从“显示内容”到“原始内容”的完整、精确的行号映射。
+*   **解决方案**: 严格遵循教程，重构 `displayWorldbookEntriesByWeight` 函数的逻辑：
+    1.  **修正筛选逻辑**: 在筛选模式下，只将符合权重条件的事件行加入 `linesToShowInTextarea` 数组。在“显示全部”模式下，则显示所有行。
+    2.  **精确缓存映射**: 无论在哪种模式下，只要一行文本被加入到 `linesToShowInTextarea` 中，就必须将其原始文本和原始行号 (`originalLineIndex`) 存入 `worldbookEntryCache.displayedLinesInfo`。
+    3.  **明确视图状态**: 只要不是“显示全部”模式，就将 `worldbookEntryCache.isFilteredView` 设置为 `true`。
+    通过这个修正，确保了保存逻辑（`$worldbookSaveButton` 的点击事件）能够基于一个完整且准确的映射来工作，从而正确地从原始内容中“删除”所有在UI上被清空的内容。
+*   **状态**: (已解决) - 已更新 `index.js` 中的 `displayWorldbookEntriesByWeight` 函数，现在按权重删除功能可以正常工作。
