@@ -1329,7 +1329,7 @@ jQuery(async () => {
         }
 
         // 定义按钮的HTML结构
-        const buttonHtml = `<div id="auto-summary-float-button" title="全自动总结" class="fa-solid fa-book-open"></div>`;
+        const buttonHtml = `<div id="auto-summary-float-button" title="全自动总结">📝</div>`;
 
         // 将按钮附加到body
         jQuery_API("body").append(buttonHtml);
