@@ -19,11 +19,18 @@ jQuery(async () => {
     const STORAGE_KEY_AUTO_SUMMARY_ENABLED = `auto-summary_autoSummaryEnabled_v1`;
     const STORAGE_KEY_VISIBILITY_OFFSET = `auto-summary_visibilityOffset_v1`;
     const STORAGE_KEY_UPLOAD_TARGET = `auto-summary_uploadTarget_v1`;
+    const STORAGE_KEY_SELECTED_SUMMARY_PRESET = `auto-summary_selectedSummaryPreset_v1`;
     const NEW_MESSAGE_DEBOUNCE_DELAY = 4000;
     const POLLING_INTERVAL = 300000;
     const DEFAULT_VISIBILITY_OFFSET = 10;
     const SUMMARY_LOREBOOK_NAME = "总结世界书";
     const DEFAULT_UPLOAD_TARGET = "current";
+    const SUMMARY_PROMPT_PRESETS = [
+        { name: "正常版", file: "正常版.txt" },
+        { name: "详细版", file: "详细版.txt" },
+        { name: "极简版", file: "极简版.txt" },
+        { name: "表格版(适合大总结)", file: "表格版适合大总结.txt" },
+    ];
 
     const DEFAULT_ADVANCED_HIDE_SETTINGS = {
         useGlobalSettings: true,
@@ -69,6 +76,7 @@ jQuery(async () => {
         $summaryPromptTextarea,
         $saveSummaryPromptButton,
         $resetSummaryPromptButton,
+        $summaryPromptPresetSelect,
         $smallSummaryRadio,
         $largeSummaryRadio,
         $smallChunkSizeInput,
@@ -119,6 +127,7 @@ jQuery(async () => {
     let autoSummaryEnabled = true;
     let uploadTargetSetting = DEFAULT_UPLOAD_TARGET;
     let currentVisibilityOffset = DEFAULT_VISIBILITY_OFFSET;
+    let selectedSummaryPresetFile = null;
 
     let newMessageDebounceTimer = null;
     let chatPollingIntervalId = null;
@@ -456,6 +465,24 @@ jQuery(async () => {
             uploadTargetSetting = DEFAULT_UPLOAD_TARGET;
         }
 
+        try {
+            const savedPreset = localStorage.getItem(
+                STORAGE_KEY_SELECTED_SUMMARY_PRESET,
+            );
+            if (
+                savedPreset &&
+                SUMMARY_PROMPT_PRESETS.some((p) => p.file === savedPreset)
+            ) {
+                selectedSummaryPresetFile = savedPreset;
+            } else {
+                selectedSummaryPresetFile = null;
+                localStorage.removeItem(STORAGE_KEY_SELECTED_SUMMARY_PRESET);
+            }
+        } catch (error) {
+            logError("加载所选总结预设失败:", error);
+            selectedSummaryPresetFile = null;
+        }
+
         if ($popupInstance) {
             if ($customApiUrlInput) $customApiUrlInput.val(customApiConfig.url);
             if ($customApiKeyInput)
@@ -709,6 +736,22 @@ jQuery(async () => {
             showToastr("error", "恢复默认破甲预设时发生浏览器存储错误。");
         }
     }
+    async function loadAndPopulateSummaryPresets() {
+        if (!$summaryPromptPresetSelect || !$summaryPromptPresetSelect.length) {
+            logDebug("预设下拉列表元素未找到。");
+            return;
+        }
+        $summaryPromptPresetSelect.find("option:not(:first)").remove();
+
+        for (const preset of SUMMARY_PROMPT_PRESETS) {
+            const option = jQuery_API("<option>", {
+                value: preset.file,
+                text: preset.name,
+            });
+            $summaryPromptPresetSelect.append(option);
+        }
+    }
+
     function saveCustomSummaryPrompt() {
         if (!$popupInstance || !$summaryPromptTextarea) {
             logError("保存总结预设失败：UI元素未初始化。");
@@ -728,6 +771,11 @@ jQuery(async () => {
                 STORAGE_KEY_CUSTOM_SUMMARY_PROMPT,
                 currentSummaryPrompt,
             );
+            localStorage.removeItem(STORAGE_KEY_SELECTED_SUMMARY_PRESET);
+            selectedSummaryPresetFile = null;
+            if ($summaryPromptPresetSelect) {
+                $summaryPromptPresetSelect.val("");
+            }
             showToastr("success", "总结预设已保存！");
             logDebug("自定义总结预设已保存到localStorage。");
         } catch (error) {
@@ -742,6 +790,11 @@ jQuery(async () => {
         }
         try {
             localStorage.removeItem(STORAGE_KEY_CUSTOM_SUMMARY_PROMPT);
+            localStorage.removeItem(STORAGE_KEY_SELECTED_SUMMARY_PRESET);
+            selectedSummaryPresetFile = null;
+            if ($summaryPromptPresetSelect) {
+                $summaryPromptPresetSelect.val("");
+            }
             showToastr("info", "总结预设已恢复为默认值！");
             logDebug("自定义总结预设已恢复为默认并从localStorage移除。");
         } catch (error) {
@@ -1374,6 +1427,7 @@ jQuery(async () => {
         let isDragging = false;
         let hasMoved = false;
         let offset = { x: 0, y: 0 };
+        let startPos = { x: 0, y: 0 }; // Store start position
 
         const dragStart = (e) => {
             isDragging = true;
@@ -1384,14 +1438,33 @@ jQuery(async () => {
             const buttonPos = button.offset();
             offset.x = event.pageX - buttonPos.left;
             offset.y = event.pageY - buttonPos.top;
+
+            startPos.x = event.pageX; // Store initial event position
+            startPos.y = event.pageY;
+
             e.preventDefault();
         };
 
         const dragMove = (e) => {
             if (!isDragging) return;
-            hasMoved = true;
+
             const event =
                 e.type === "touchmove" ? e.originalEvent.touches[0] : e;
+
+            // Check for movement threshold before setting hasMoved
+            if (!hasMoved) {
+                if (
+                    Math.abs(event.pageX - startPos.x) > 5 ||
+                    Math.abs(event.pageY - startPos.y) > 5
+                ) {
+                    hasMoved = true;
+                }
+            }
+
+            // Only move if it's a confirmed drag
+            if (!hasMoved) {
+                return;
+            }
 
             const buttonWidth = button.outerWidth();
             const buttonHeight = button.outerHeight();
@@ -1626,6 +1699,12 @@ jQuery(async () => {
         $summaryPromptAreaDiv = $popupInstance.find(
             `#chatSummarizerWorldbookAdv-summary-prompt-area-div`,
         );
+        $summaryPromptAreaDiv = $popupInstance.find(
+            `#chatSummarizerWorldbookAdv-summary-prompt-area-div`,
+        );
+        $summaryPromptPresetSelect = $popupInstance.find(
+            `#chatSummarizerWorldbookAdv-summary-prompt-preset-select`,
+        );
         $summaryPromptTextarea = $popupInstance.find(
             `#chatSummarizerWorldbookAdv-summary-prompt-textarea`,
         );
@@ -1775,6 +1854,64 @@ jQuery(async () => {
             $saveSummaryPromptButton.on("click", saveCustomSummaryPrompt);
         if ($resetSummaryPromptButton.length)
             $resetSummaryPromptButton.on("click", resetDefaultSummaryPrompt);
+
+        if ($summaryPromptPresetSelect.length) {
+            loadAndPopulateSummaryPresets();
+            $summaryPromptPresetSelect.on("change", async function () {
+                const selectedFile = jQuery_API(this).val();
+                selectedSummaryPresetFile = selectedFile;
+
+                try {
+                    if (selectedFile) {
+                        localStorage.setItem(
+                            STORAGE_KEY_SELECTED_SUMMARY_PRESET,
+                            selectedFile,
+                        );
+                    } else {
+                        localStorage.removeItem(
+                            STORAGE_KEY_SELECTED_SUMMARY_PRESET,
+                        );
+                    }
+                } catch (error) {
+                    logError("保存所选总结预设失败:", error);
+                }
+
+                if (selectedFile && $summaryPromptTextarea) {
+                    try {
+                        const presetContent = await jQuery_API.get(
+                            `${extensionFolderPath}/${selectedFile}`,
+                        );
+                        $summaryPromptTextarea.val(presetContent);
+                        currentSummaryPrompt = presetContent;
+                        showToastr(
+                            "info",
+                            `已加载预设: ${jQuery_API(this).find("option:selected").text()}`,
+                        );
+                    } catch (error) {
+                        logError(`加载预设 ${selectedFile} 失败:`, error);
+                        showToastr("error", `加载预设失败，请查看控制台。`);
+                    }
+                } else if ($summaryPromptTextarea) {
+                    const savedPrompt =
+                        localStorage.getItem(
+                            STORAGE_KEY_CUSTOM_SUMMARY_PROMPT,
+                        ) || DEFAULT_SUMMARY_PROMPT;
+                    $summaryPromptTextarea.val(savedPrompt);
+                    currentSummaryPrompt = savedPrompt;
+                }
+            });
+
+            if (selectedSummaryPresetFile) {
+                $summaryPromptPresetSelect
+                    .val(selectedSummaryPresetFile)
+                    .trigger("change");
+            } else {
+                $summaryPromptPresetSelect.val("");
+                if ($summaryPromptTextarea) {
+                    $summaryPromptTextarea.val(currentSummaryPrompt);
+                }
+            }
+        }
 
         if ($saveVisibilityOffsetButton.length)
             $saveVisibilityOffsetButton.on(
