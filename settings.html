@@ -1,132 +1,156 @@
-    <h2 id="summarizer-main-title" style="display:none;">聊天记录总结与上传</h2>
-    <p class="author-info">插件作者：AI (萧然) & Gemini (原始作者: 默默)</p>
-    <div id="chatSummarizerWorldbookAdv-theme-colors-container" style="margin-bottom: 10px;">
-        <p style="font-size:0.8em; text-align:center; margin-bottom:5px;">选择预设主题色:</p>
-        <div class="button-group chatSummarizerWorldbookAdv-theme-button-wrapper" style="margin-bottom: 15px; justify-content: flex-start;">
-            <!-- Theme buttons will be dynamically inserted here -->
-        </div>
-        <div id="chatSummarizerWorldbookAdv-custom-color-picker-container" style="margin-top: 10px; text-align: center;">
-            <label for="chatSummarizerWorldbookAdv-custom-color-input" style="margin-right: 8px; font-size:0.9em;">自定义主题色:</label>
-            <input type="color" id="chatSummarizerWorldbookAdv-custom-color-input" value="#61afef" style="vertical-align: middle; width: 50px; height: 25px; border: 1px solid #ccc; padding:1px;">
+<p class="author-info">插件作者：AI (萧然) & Gemini (原始作者: 默默)</p>
+
+
+<!-- API 设置 -->
+<div class="as-section">
+    <div class="as-section-header" id="chatSummarizerWorldbookAdv-api-config-toggle">
+        <h3><i class="fa-solid fa-key"></i> API 设置</h3>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="as-section-content" id="chatSummarizerWorldbookAdv-api-config-area-div">
+        <p style="color:var(--as-warning-color); font-size: 0.9em;"><b>安全提示:</b> API密钥将保存在您的浏览器本地存储中。请勿在公共或不信任的计算机上使用此功能保存密钥。</p>
+        <label for="chatSummarizerWorldbookAdv-api-url">API基础URL:</label>
+        <input type="text" id="chatSummarizerWorldbookAdv-api-url" placeholder="例如: https://api.openai.com/v1">
+        <label for="chatSummarizerWorldbookAdv-api-key">API密钥 (可选):</label>
+        <input type="password" id="chatSummarizerWorldbookAdv-api-key">
+        <button id="chatSummarizerWorldbookAdv-load-models" class="as-button as-secondary"><i class="fa-solid fa-sync"></i> 加载模型列表</button>
+        <label for="chatSummarizerWorldbookAdv-api-model">选择模型:</label>
+        <select id="chatSummarizerWorldbookAdv-api-model"><option value="">请先加载模型</option></select>
+        <div id="chatSummarizerWorldbookAdv-api-status">状态: 未配置</div>
+        <div class="button-group">
+            <button id="chatSummarizerWorldbookAdv-save-config" class="as-button as-success"><i class="fa-solid fa-save"></i> 保存API配置</button>
+            <button id="chatSummarizerWorldbookAdv-clear-config" class="as-button as-danger"><i class="fa-solid fa-trash"></i> 清除API配置</button>
         </div>
     </div>
+</div>
 
-    <div class="section api-config-section">
-        <h3 id="chatSummarizerWorldbookAdv-api-config-toggle">api设置 <small>(点击展开/折叠)</small></h3>
-        <div id="chatSummarizerWorldbookAdv-api-config-area-div" class="config-area">
-            <p style="color:#E57373;"><b>安全提示:</b> API密钥将保存在您的浏览器本地存储中。请勿在公共或不信任的计算机上使用此功能保存密钥。</p>
-            <label for="chatSummarizerWorldbookAdv-api-url">API基础URL (例如: https://api.openai.com/v1):</label>
-            <input type="text" id="chatSummarizerWorldbookAdv-api-url">
-            <label for="chatSummarizerWorldbookAdv-api-key">API密钥 (可选):</label>
-            <input type="password" id="chatSummarizerWorldbookAdv-api-key">
-            <button id="chatSummarizerWorldbookAdv-load-models">加载模型列表</button>
-            <label for="chatSummarizerWorldbookAdv-api-model">选择模型:</label>
-            <select id="chatSummarizerWorldbookAdv-api-model"><option value="">请先加载模型</option></select>
-            <div id="chatSummarizerWorldbookAdv-api-status">状态: 未配置</div>
-            <div class="button-group" style="margin-top:10px;"><button id="chatSummarizerWorldbookAdv-save-config">保存API配置</button><button id="chatSummarizerWorldbookAdv-clear-config">清除API配置</button></div>
+<!-- 破甲预设 -->
+<div class="as-section">
+    <div class="as-section-header" id="chatSummarizerWorldbookAdv-break-armor-prompt-toggle">
+        <h3><i class="fa-solid fa-user-shield"></i> 破甲预设 (AI角色定义)</h3>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="as-section-content" id="chatSummarizerWorldbookAdv-break-armor-prompt-area-div">
+        <p>这部分定义AI（beilu）的角色和基本规则。</p>
+        <label for="chatSummarizerWorldbookAdv-break-armor-prompt-textarea">破甲预设内容:</label>
+        <textarea id="chatSummarizerWorldbookAdv-break-armor-prompt-textarea"></textarea>
+        <div class="button-group">
+            <button id="chatSummarizerWorldbookAdv-save-break-armor-prompt" class="as-button as-success"><i class="fa-solid fa-save"></i> 保存</button>
+            <button id="chatSummarizerWorldbookAdv-reset-break-armor-prompt" class="as-button as-secondary"><i class="fa-solid fa-undo"></i> 恢复默认</button>
         </div>
     </div>
+</div>
 
-    <div class="section custom-prompt-section">
-        <h3 id="chatSummarizerWorldbookAdv-break-armor-prompt-toggle">破甲预设 (AI角色定义) <small>(点击展开/折叠)</small></h3>
-        <div id="chatSummarizerWorldbookAdv-break-armor-prompt-area-div" class="config-area">
-            <p style="color:#81C784;">这部分定义AI（beilu）的角色和基本规则。</p>
-            <label for="chatSummarizerWorldbookAdv-break-armor-prompt-textarea">破甲预设内容:</label>
-            <textarea id="chatSummarizerWorldbookAdv-break-armor-prompt-textarea"></textarea>
-            <div class="button-group" style="margin-top:10px;"><button id="chatSummarizerWorldbookAdv-save-break-armor-prompt">保存破甲预设</button><button id="chatSummarizerWorldbookAdv-reset-break-armor-prompt">恢复默认破甲预设</button></div>
+<!-- 总结预设 -->
+<div class="as-section">
+    <div class="as-section-header" id="chatSummarizerWorldbookAdv-summary-prompt-toggle">
+        <h3><i class="fa-solid fa-file-alt"></i> 总结预设 (任务与格式)</h3>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="as-section-content" id="chatSummarizerWorldbookAdv-summary-prompt-area-div">
+        <p>这部分定义AI总结的具体任务、权重计算方式和输出格式。</p>
+        <label for="chatSummarizerWorldbookAdv-summary-prompt-textarea">总结预设内容:</label>
+        <textarea id="chatSummarizerWorldbookAdv-summary-prompt-textarea"></textarea>
+        <div class="button-group">
+            <button id="chatSummarizerWorldbookAdv-save-summary-prompt" class="as-button as-success"><i class="fa-solid fa-save"></i> 保存</button>
+            <button id="chatSummarizerWorldbookAdv-reset-summary-prompt" class="as-button as-secondary"><i class="fa-solid fa-undo"></i> 恢复默认</button>
         </div>
     </div>
+</div>
 
-    <div class="section custom-prompt-section">
-        <h3 id="chatSummarizerWorldbookAdv-summary-prompt-toggle">总结预设 (任务与格式) <small>(点击展开/折叠)</small></h3>
-        <div id="chatSummarizerWorldbookAdv-summary-prompt-area-div" class="config-area">
-            <p style="color:#81C784;">这部分定义AI总结的具体任务、权重计算方式和输出格式。</p>
-            <label for="chatSummarizerWorldbookAdv-summary-prompt-textarea">总结预设内容:</label>
-            <textarea id="chatSummarizerWorldbookAdv-summary-prompt-textarea"></textarea>
-            <div class="button-group" style="margin-top:10px;"><button id="chatSummarizerWorldbookAdv-save-summary-prompt">保存总结预设</button><button id="chatSummarizerWorldbookAdv-reset-summary-prompt">恢复默认总结预设</button></div>
-        </div>
+<!-- 统计信息 -->
+<div class="as-section">
+    <div class="as-section-header">
+        <h3><i class="fa-solid fa-chart-bar"></i> 统计信息</h3>
     </div>
-
-    <div class="section stats-section">
-        <h3>统计信息</h3>
+    <div class="as-section-content">
         <p>总消息数: <span id="chatSummarizerWorldbookAdv-total-messages">0</span> | 总字符数: <span id="chatSummarizerWorldbookAdv-total-chars">0</span></p>
         <p>总结状态: <span id="chatSummarizerWorldbookAdv-summary-status">尚未加载</span></p>
     </div>
+</div>
 
-    <div class="section worldbook-display-section">
-        <h3 id="chatSummarizerWorldbookAdv-worldbook-display-toggle">世界书条目内容 (按权重筛选) <small>(点击展开/折叠)</small></h3>
-        <div id="chatSummarizerWorldbookAdv-worldbook-display-area-div" class="config-area" style="display:block;">
-            <p>根据事件权重筛选显示当前总结的世界书条目内容。点击按钮以应用筛选。</p>
-            <div id="chatSummarizerWorldbookAdv-worldbook-filter-buttons" class="button-group" style="margin-bottom: 10px; justify-content: center;">
-                <button class="worldbook-filter-btn" data-min-weight="0.0" data-max-weight="0.1">0.0-0.1</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.1" data-max-weight="0.2">0.1-0.2</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.2" data-max-weight="0.3">0.2-0.3</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.3" data-max-weight="0.4">0.3-0.4</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.4" data-max-weight="0.5">0.4-0.5</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.5" data-max-weight="0.6">0.5-0.6</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.6" data-max-weight="0.7">0.6-0.7</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.7" data-max-weight="0.8">0.7-0.8</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.8" data-max-weight="0.9">0.8-0.9</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.9" data-max-weight="1.0">0.9-1.0</button>
-                <button class="worldbook-filter-btn" data-min-weight="0.0" data-max-weight="1.0" style="flex-basis: 100%; margin-top: 5px;">显示全部</button>
-            </div>
-            <textarea id="chatSummarizerWorldbookAdv-worldbook-content-display-textarea" placeholder="请先加载或生成总结，或通过筛选显示条目内容..."></textarea>
-            <div class="worldbook-edit-actions">
-                <button id="chatSummarizerWorldbookAdv-worldbook-clear-button">清空全部</button>
-                <button id="chatSummarizerWorldbookAdv-worldbook-save-button">保存修改</button>
-            </div>
+<!-- 世界书条目 -->
+<div class="as-section">
+    <div class="as-section-header" id="chatSummarizerWorldbookAdv-worldbook-display-toggle">
+        <h3><i class="fa-solid fa-book"></i> 世界书条目内容</h3>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="as-section-content" id="chatSummarizerWorldbookAdv-worldbook-display-area-div">
+        <p>根据事件权重筛选显示当前总结的世界书条目内容。</p>
+        <div id="chatSummarizerWorldbookAdv-worldbook-filter-buttons" class="worldbook-filter-buttons">
+            <!-- Filter buttons will be dynamically inserted here -->
+        </div>
+        <textarea id="chatSummarizerWorldbookAdv-worldbook-content-display-textarea" placeholder="请先加载或生成总结..."></textarea>
+        <div class="button-group" style="justify-content: flex-end;">
+            <button id="chatSummarizerWorldbookAdv-worldbook-clear-button" class="as-button as-danger"><i class="fa-solid fa-eraser"></i> 清空全部</button>
+            <button id="chatSummarizerWorldbookAdv-worldbook-save-button" class="as-button as-success"><i class="fa-solid fa-save"></i> 保存修改</button>
         </div>
     </div>
+</div>
 
-    <div class="section manual-summary-section">
-        <h3>手动总结</h3>
-        <div class="manual-summary-controls">
-            <label for="chatSummarizerWorldbookAdv-manual-start">从楼层:</label> <input type="number" id="chatSummarizerWorldbookAdv-manual-start" min="1">
-            <label for="chatSummarizerWorldbookAdv-manual-end" style="margin-left:10px;">到楼层:</label> <input type="number" id="chatSummarizerWorldbookAdv-manual-end" min="1">
-            <button id="chatSummarizerWorldbookAdv-manual-summarize">总结选中楼层并上传</button>
+<!-- 手动总结 -->
+<div class="as-section">
+    <div class="as-section-header">
+        <h3><i class="fa-solid fa-hand-paper"></i> 手动总结</h3>
+    </div>
+    <div class="as-section-content">
+        <div class="control-group">
+            <label for="chatSummarizerWorldbookAdv-manual-start">从楼层:</label>
+            <input type="number" id="chatSummarizerWorldbookAdv-manual-start" min="1">
+            <label for="chatSummarizerWorldbookAdv-manual-end">到楼层:</label>
+            <input type="number" id="chatSummarizerWorldbookAdv-manual-end" min="1">
+            <button id="chatSummarizerWorldbookAdv-manual-summarize" class="as-button"><i class="fa-solid fa-play"></i> 总结选中楼层</button>
         </div>
     </div>
+</div>
 
-    <div class="section auto-summary-section">
-        <h3>自动总结</h3>
-        <div style="margin-bottom: 10px; display: flex; gap: 15px; align-items: center;">
-            <label style="margin:0;"><input type="radio" name="chatSummarizerWorldbookAdv-summary-type" value="small" id="chatSummarizerWorldbookAdv-small-summary-radio" style="width:auto; margin-right:5px;">小总结</label>
-            <label style="margin:0;"><input type="radio" name="chatSummarizerWorldbookAdv-summary-type" value="large" id="chatSummarizerWorldbookAdv-large-summary-radio" style="width:auto; margin-right:5px;">大总结</label>
-        </div>
-        <div id="chatSummarizerWorldbookAdv-small-chunk-size-container" style="margin-bottom: 10px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
-            <label for="chatSummarizerWorldbookAdv-small-custom-chunk-size" id="chatSummarizerWorldbookAdv-small-custom-chunk-size-label">小总结间隔 (层, 双数):</label>
-            <input type="number" id="chatSummarizerWorldbookAdv-small-custom-chunk-size" min="2" step="2" placeholder="10" style="width: 80px !important; flex-grow:0; flex-shrink:0;">
-        </div>
-        <div id="chatSummarizerWorldbookAdv-large-chunk-size-container" style="margin-bottom: 10px; display: none; align-items: center; gap: 5px; flex-wrap: wrap;">
-            <label for="chatSummarizerWorldbookAdv-large-custom-chunk-size" id="chatSummarizerWorldbookAdv-large-custom-chunk-size-label">大总结间隔 (层, 双数):</label>
-            <input type="number" id="chatSummarizerWorldbookAdv-large-custom-chunk-size" min="2" step="2" placeholder="30" style="width: 80px !important; flex-grow:0; flex-shrink:0;">
-        </div>
-        <div style="margin-bottom: 10px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 10px;">
-            <label style="display: block; margin-bottom: 5px;">上传目标:</label>
-            <div style="display: flex; gap: 15px; align-items: center;">
-                <label style="margin:0;"><input type="radio" name="chatSummarizerWorldbookAdv-upload-target" value="current" id="chatSummarizerWorldbookAdv-upload-target-current" style="width:auto; margin-right:5px;">当前角色主世界书</label>
-                <label style="margin:0;"><input type="radio" name="chatSummarizerWorldbookAdv-upload-target" value="summary" id="chatSummarizerWorldbookAdv-upload-target-summary" style="width:auto; margin-right:5px;">总结世界书</label>
-            </div>
-        </div>
-        <div style="margin-bottom: 10px; display: flex; align-items: center;">
-            <input type="checkbox" id="chatSummarizerWorldbookAdv-auto-summary-enabled-checkbox" style="width:auto; margin-right:8px;">
-            <label for="chatSummarizerWorldbookAdv-auto-summary-enabled-checkbox" style="margin:0; font-size:0.9em;">启用聊天中自动总结触发</label>
-        </div>
-        <div class="button-group"><button id="chatSummarizerWorldbookAdv-auto-summarize">手动执行自动总结</button></div>
+<!-- 自动总结 -->
+<div class="as-section">
+    <div class="as-section-header">
+        <h3><i class="fa-solid fa-robot"></i> 自动总结</h3>
     </div>
-
-    <div class="section advanced-hide-settings-section">
-        <h3 id="chatSummarizerWorldbookAdv-advanced-hide-settings-toggle">消息隐藏设置 <small>(点击展开/折叠)</small></h3>
-        <div id="chatSummarizerWorldbookAdv-advanced-hide-settings-area-div" class="config-area" style="display:block;">
-            <p>聊天中可见的最新消息数量将根据当前选择的总结类型（小总结/大总结）及其对应的总结间隔层数 (N) 加上一个偏移量 (X) 自动设置为 N + X。</p>
-            <span id="chatSummarizerWorldbookAdv-hide-current-value-display" style="font-style: italic;">正在获取当前设置...</span>
-            <div class="visibility-offset-controls">
-               <label for="chatSummarizerWorldbookAdv-visibility-offset-input">可见性偏移量 (X):</label>
-               <input type="number" id="chatSummarizerWorldbookAdv-visibility-offset-input" min="0" step="1" placeholder="10">
-               <button id="chatSummarizerWorldbookAdv-save-visibility-offset">保存偏移量</button>
-            </div>
-            <p style="font-size:0.8em; margin-top:8px;">注意：此设置会动态修改聊天消息的可见性，但不会删除任何消息。</p>
+    <div class="as-section-content">
+        <div class="control-group">
+            <label><input type="radio" name="chatSummarizerWorldbookAdv-summary-type" value="small" id="chatSummarizerWorldbookAdv-small-summary-radio" style="width:auto;"> 小总结</label>
+            <label><input type="radio" name="chatSummarizerWorldbookAdv-summary-type" value="large" id="chatSummarizerWorldbookAdv-large-summary-radio" style="width:auto;"> 大总结</label>
+        </div>
+        <div id="chatSummarizerWorldbookAdv-small-chunk-size-container" class="control-group">
+            <label for="chatSummarizerWorldbookAdv-small-custom-chunk-size">小总结间隔 (层):</label>
+            <input type="number" id="chatSummarizerWorldbookAdv-small-custom-chunk-size" min="2" step="2" placeholder="10">
+        </div>
+        <div id="chatSummarizerWorldbookAdv-large-chunk-size-container" class="control-group" style="display: none;">
+            <label for="chatSummarizerWorldbookAdv-large-custom-chunk-size">大总结间隔 (层):</label>
+            <input type="number" id="chatSummarizerWorldbookAdv-large-custom-chunk-size" min="2" step="2" placeholder="30">
+        </div>
+        <div class="control-group">
+            <label>上传目标:</label>
+            <label><input type="radio" name="chatSummarizerWorldbookAdv-upload-target" value="current" id="chatSummarizerWorldbookAdv-upload-target-current" style="width:auto;"> 当前角色主世界书</label>
+            <label><input type="radio" name="chatSummarizerWorldbookAdv-upload-target" value="summary" id="chatSummarizerWorldbookAdv-upload-target-summary" style="width:auto;"> 总结世界书</label>
+        </div>
+        <div class="control-group">
+            <label><input type="checkbox" id="chatSummarizerWorldbookAdv-auto-summary-enabled-checkbox" style="width:auto;"> 启用聊天中自动总结</label>
+        </div>
+        <div class="button-group">
+            <button id="chatSummarizerWorldbookAdv-auto-summarize" class="as-button as-outline"><i class="fa-solid fa-cogs"></i> 手动执行自动总结</button>
         </div>
     </div>
+</div>
 
-    <p id="chatSummarizerWorldbookAdv-status-message" style="font-style:italic;">准备就绪</p>
+<!-- 消息隐藏设置 -->
+<div class="as-section">
+    <div class="as-section-header" id="chatSummarizerWorldbookAdv-advanced-hide-settings-toggle">
+        <h3><i class="fa-solid fa-eye-slash"></i> 消息隐藏设置</h3>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="as-section-content" id="chatSummarizerWorldbookAdv-advanced-hide-settings-area-div">
+        <p>根据总结间隔 (N) 和偏移量 (X) 自动设置聊天中可见的最新消息数量为 N + X。</p>
+        <span id="chatSummarizerWorldbookAdv-hide-current-value-display" style="font-style: italic; color: var(--as-text-muted-color);">正在获取当前设置...</span>
+        <div class="control-group">
+           <label for="chatSummarizerWorldbookAdv-visibility-offset-input">可见性偏移量 (X):</label>
+           <input type="number" id="chatSummarizerWorldbookAdv-visibility-offset-input" min="0" step="1" placeholder="10">
+           <button id="chatSummarizerWorldbookAdv-save-visibility-offset" class="as-button as-secondary"><i class="fa-solid fa-save"></i> 保存偏移量</button>
+        </div>
+    </div>
+</div>
+
+<p id="chatSummarizerWorldbookAdv-status-message" style="text-align: center; color: var(--as-text-muted-color); font-style: italic; margin-top: 10px;">准备就绪</p>

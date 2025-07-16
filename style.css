@@ -1,164 +1,336 @@
-/* --- 浮动按钮样式 --- */
+/* --- 全局与基础样式 --- */
+:root {
+    --as-main-bg-color: #2c2f33;
+    --as-section-bg-color: #23272a;
+    --as-text-color: #ffffff;
+    --as-text-muted-color: #99aab5;
+    --as-primary-accent-color: #7289da; /* Discord Blurple */
+    --as-primary-accent-hover-color: #677bc4;
+    --as-success-color: #43b581; /* Discord Green */
+    --as-warning-color: #faa61a; /* Discord Yellow */
+    --as-danger-color: #f04747; /* Discord Red */
+    --as-border-color: #40444b;
+    --as-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    --as-border-radius: 8px;
+    --as-box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+}
+
+/* --- 浮动按钮样式 (借鉴Quest System) --- */
 #auto-summary-float-button {
     position: fixed !important;
-    z-index: 1050;
+    z-index: 9998; /* Below popup and overlay */
     cursor: grab;
     width: 48px;
     height: 48px;
-    background-color: var(--primary-color, #007bff);
-    color: var(--primary-text-color, white);
+    background: linear-gradient(145deg, #2f3338, #212529);
+    color: var(--as-primary-accent-color);
     border-radius: 50%;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 2px 2px rgba(255, 255, 255, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, color 0.2s ease-out;
 }
 
-/* --- 新弹窗布局样式 --- */
+#auto-summary-float-button:hover {
+    transform: scale(1.1);
+    color: var(--as-primary-accent-hover-color);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), inset 0 2px 3px rgba(255, 255, 255, 0.08), 0 0 10px var(--as-primary-accent-color); /* Glow effect */
+}
+
+#auto-summary-float-button:active {
+    transform: scale(1.05);
+    cursor: grabbing;
+}
+
+/* --- 新弹窗布局样式 (借鉴Quest System) --- */
+.as-popup-overlay {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 9999;
+}
+
 .as-popup {
     position: fixed !important;
-    z-index: 1100; /* 比按钮更高 */
+    z-index: 10000;
+    /* 移动端优先：距离顶部和左侧有边距，避免溢出 */
     top: 5vh !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: 95vw !important;
-    max-width: 800px !important;
-    max-height: 85vh !important;
+    left: 5vw !important;
+    width: 90vw;
+    height: 90vh;
+    background-color: var(--as-main-bg-color);
+    color: var(--as-text-color);
+    font-family: var(--as-font-family);
     display: flex;
     flex-direction: column;
+    border-radius: var(--as-border-radius);
+    box-shadow: var(--as-box-shadow);
+    border: 1px solid var(--as-border-color);
     overflow: hidden;
-    background-color: var(--background-color, #fff);
-    color: var(--text-color, #000);
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    /* 移除 transform 以便在移动端正确定位 */
+}
+
+/* 桌面端响应式布局：当屏幕宽度大于768px时，恢复居中 */
+@media (min-width: 768px) {
+    .as-popup {
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 60vw;
+        max-width: 800px;
+        height: 80vh;
+    }
 }
 
 .as-popup-header {
+    flex-shrink: 0;
+    padding: 16px;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid var(--as-border-color);
+    cursor: move;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 15px;
-    background-color: var(--primary-color, #007bff);
-    color: var(--primary-text-color, white);
-    cursor: move;
-    border-bottom: 1px solid var(--border-color, #ddd);
 }
 
 .as-popup-header h2 {
     margin: 0;
     font-size: 1.2em;
+    color: var(--as-primary-accent-color);
 }
 
 #as-popup-close {
-    font-size: 1.5em;
+    background: transparent;
+    border: none;
+    color: var(--as-text-muted-color);
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 1;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: color 0.2s;
 }
+
 #as-popup-close:hover {
-    transform: scale(1.2);
+    color: var(--as-text-color);
 }
 
 .as-popup-body {
     flex-grow: 1;
+    padding: 16px;
     overflow-y: auto;
-    padding: 15px;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none;  /* IE and Edge */
-}
-.as-popup-body::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, and Opera */
-}
-
-
-/* --- 内部元素样式 (从旧ID迁移) --- */
-.as-popup-body #chatSummarizerWorldbookAdv-popup { /* ... styles ... */ }
-.as-popup-body #chatSummarizerWorldbookAdv-popup h2#summarizer-main-title { margin-top:0; padding-bottom:8px; margin-bottom:10px; font-size: 1.1em; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .author-info { font-size: 0.85em; text-align: center; margin-bottom: 10px; padding: 5px; border-radius: 3px;}
-.as-popup-body #chatSummarizerWorldbookAdv-popup .section { margin-bottom:15px; padding:12px; border-radius:5px; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .section h3 { margin-top:0; padding-bottom:8px; margin-bottom:10px; font-size: 1.1em; cursor:pointer; user-select:none;}
-.as-popup-body #chatSummarizerWorldbookAdv-popup .section h3 small { font-size: 0.85em; opacity: 0.8; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .config-area { display:none; padding:10px; margin-top:5px; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .config-area label { display:block; margin-top:10px; margin-bottom:4px; font-size:0.9em; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .config-area p { font-size:0.8em; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup input, .as-popup-body #chatSummarizerWorldbookAdv-popup select, .as-popup-body #chatSummarizerWorldbookAdv-popup textarea {
-    padding:8px; border-radius:3px; margin: 0 0 8px 0; box-sizing:border-box; width:100%; font-size: 0.95em;
-}
-.as-popup-body #chatSummarizerWorldbookAdv-popup textarea { min-height:100px; resize:vertical; } /* Adjusted min-height for two textareas */
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-api-status { font-size:0.85em; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .button-group { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup button:disabled { background-color:#555 !important; color:#888 !important; cursor:not-allowed; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .section button:not(.chatSummarizerWorldbookAdv-theme-button) {
-    padding:8px 12px; margin:4px; border-radius:4px; cursor:pointer; transition:background-color 0.2s ease;
-    font-size:0.95em; flex-grow: 1; min-width: 120px;
-}
-.as-popup-body #chatSummarizerWorldbookAdv-popup .chatSummarizerWorldbookAdv-theme-button { transition: transform 0.1s ease-out; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .chatSummarizerWorldbookAdv-theme-button:hover { transform: scale(1.15); }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .manual-summary-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .manual-summary-controls input[type='number'] { flex: 1 1 100px; min-width: 80px; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .manual-summary-controls button { flex: 1 1 auto; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .manual-summary-controls label { flex-basis: auto; margin-right: 5px; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-custom-chunk-size-container label { margin: 0; font-size: 0.9em; flex-shrink: 0;} /* Old, to be removed or adapted */
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-custom-chunk-size { width: 80px !important; flex-grow:0; flex-shrink:0; } /* Old, to to be removed or adapted */
-/* New styles for small/large chunk size containers */
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-small-chunk-size-container, .as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-large-chunk-size-container { margin-bottom: 10px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-small-chunk-size-container label, .as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-large-chunk-size-container label { margin: 0; font-size: 0.9em; flex-shrink: 0;}
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-small-custom-chunk-size, .as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-large-custom-chunk-size { width: 80px !important; flex-grow:0; flex-shrink:0; }
-/* Styles for Advanced Hide Settings */
-.as-popup-body #chatSummarizerWorldbookAdv-popup .advanced-hide-settings-section .config-area { display: block; } /* Keep it open by default */
-/* #chatSummarizerWorldbookAdv-hide-mode-toggle-button style removed as button is removed */
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-hide-current-value-display { font-size: 0.9em; margin-bottom: 10px; display: block; } /* Ensure it's a block for spacing */
-.as-popup-body #chatSummarizerWorldbookAdv-popup .visibility-offset-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .visibility-offset-controls label { margin: 0; font-size: 0.9em; flex-shrink: 0; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .visibility-offset-controls input[type='number'] { width: 70px !important; flex-grow: 0; flex-shrink: 0; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .visibility-offset-controls button { min-width: 80px; flex-grow: 0; padding: 6px 10px; font-size: 0.9em; }
-
-/* Worldbook Filter Button Styles */
-.as-popup-body #chatSummarizerWorldbookAdv-popup .worldbook-filter-btn {
-    padding: 5px 8px; 
-    font-size: 0.85em; 
-    min-width: 55px; 
-    flex-grow: 0; 
-    background-color: #e0e0e0; 
-    color: #333;
-    border: 1px solid #ccc;
-    margin: 2px !important; 
-}
-.as-popup-body #chatSummarizerWorldbookAdv-popup .worldbook-filter-btn:hover {
-    background-color: #d0d0d0;
-}
-.as-popup-body #chatSummarizerWorldbookAdv-popup .worldbook-filter-btn.active-filter { 
-    background-color: #78C1C3; 
-    color: #FFFFFF;
-    border-color: #5a9a9c;
-}
-
-/* Worldbook Content Display (now textarea) styles */
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-worldbook-content-display-textarea {
-    height: 200px;
-    width: 100%; 
-    overflow-y: auto;
-    border: 1px solid #ccc;
-    padding: 8px; 
-    background-color: #FFFFFF; 
-    color: #222222; /* Darker text for better readability */
-    white-space: pre-wrap;
-    font-family: monospace; 
-    font-size: 0.9em;
-    margin-bottom: 5px; 
-    box-sizing: border-box; 
-}
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-worldbook-content-display-textarea::-webkit-scrollbar { display: none; }
-.as-popup-body #chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-worldbook-content-display-textarea { scrollbar-width: none; -ms-overflow-style: none; }
-
-.as-popup-body #chatSummarizerWorldbookAdv-popup .worldbook-edit-actions {
     display: flex;
-    gap: 10px;
-    justify-content: flex-end; 
-    margin-top: 5px;
+    flex-direction: column;
+    gap: 16px;
+    background-color: var(--as-main-bg-color);
 }
-.as-popup-body #chatSummarizerWorldbookAdv-popup .worldbook-edit-actions button {
-    min-width: 100px; 
-    flex-grow: 0; 
+
+.as-popup-body p {
+    color: var(--as-text-muted-color);
+}
+
+/* 隐藏滚动条但保留功能 */
+.as-popup-body::-webkit-scrollbar { display: none; }
+.as-popup-body { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* --- 区块样式 --- */
+.as-section {
+    background-color: var(--as-section-bg-color);
+    border-radius: var(--as-border-radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.as-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--as-border-color);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.as-section-header h3 {
+    margin: 0;
+    font-size: 1.1em;
+    color: var(--as-text-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.as-section-header .toggle-icon {
+    transition: transform 0.3s ease;
+}
+
+.as-section.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.as-section-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.as-section.collapsed .as-section-content {
+    display: none;
+}
+
+/* --- 表单与控件样式 --- */
+.as-popup-body label {
+    color: var(--as-text-muted-color);
+    font-size: 0.9em;
+    margin-bottom: 4px;
+}
+
+.as-popup-body input,
+.as-popup-body select,
+.as-popup-body textarea {
+    width: 100%;
+    padding: 10px;
+    background-color: var(--as-main-bg-color);
+    border: 1px solid var(--as-border-color);
+    border-radius: 5px;
+    color: var(--as-text-color);
+    font-family: var(--as-font-family);
+    font-size: 0.95em;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.as-popup-body input:focus,
+.as-popup-body select:focus,
+.as-popup-body textarea:focus {
+    outline: none;
+    border-color: var(--as-primary-accent-color);
+    box-shadow: 0 0 5px var(--as-primary-accent-color);
+}
+
+.as-popup-body textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.as-popup-body .button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-start;
+}
+
+.as-button {
+    background-color: var(--as-primary-accent-color);
+    color: var(--as-text-color);
+    border: none;
+    padding: 10px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: 500;
+    transition: background-color 0.2s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.as-button:hover {
+    background-color: var(--as-primary-accent-hover-color);
+}
+
+.as-button:active {
+    transform: scale(0.98);
+}
+
+.as-button.as-success { background-color: var(--as-success-color); }
+.as-button.as-warning { background-color: var(--as-warning-color); color: var(--as-section-bg-color); }
+.as-button.as-danger { background-color: var(--as-danger-color); }
+.as-button.as-secondary { background-color: #6a7480; }
+.as-button.as-outline { background-color: transparent; border: 1px solid var(--as-primary-accent-color); }
+
+.as-button:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* --- 特定区域样式 --- */
+.author-info {
+    font-size: 0.85em;
+    text-align: center;
+    color: var(--as-text-muted-color);
+    padding: 5px;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 5px;
+}
+
+#chatSummarizerWorldbookAdv-api-status {
+    font-size: 0.9em;
+    color: var(--as-text-muted-color);
+    padding: 8px;
+    border-left: 3px solid var(--as-warning-color);
+    background-color: rgba(250, 166, 26, 0.1);
+}
+
+
+.control-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.control-group label {
+    flex-shrink: 0;
+    margin-bottom: 0;
+}
+
+.control-group input[type='number'] {
+    width: 80px;
+}
+
+.worldbook-filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.worldbook-filter-btn {
+    background-color: var(--as-main-bg-color);
+    color: var(--as-text-muted-color);
+    border: 1px solid var(--as-border-color);
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.worldbook-filter-btn:hover {
+    background-color: var(--as-border-color);
+    color: var(--as-text-color);
+}
+
+.worldbook-filter-btn.active-filter {
+    background-color: var(--as-primary-accent-color);
+    color: var(--as-text-color);
+    border-color: var(--as-primary-accent-color);
+}
+
+#chatSummarizerWorldbookAdv-worldbook-content-display-textarea {
+    font-family: 'Courier New', Courier, monospace;
+    background-color: #1e1e1e; /* Darker for code/log-like content */
+}
+
+.hidden {
+    display: none !important;
 }
