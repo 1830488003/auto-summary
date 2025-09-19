@@ -1900,8 +1900,6 @@ jQuery(async () => {
                 uploadTargetSetting === "summary",
             );
 
-        if ($autoSummaryEnabledCheckbox)
-            $autoSummaryEnabledCheckbox.prop("checked", autoSummaryEnabled);
         if ($visibilityOffsetInput)
             $visibilityOffsetInput.val(currentVisibilityOffset);
 
@@ -2065,24 +2063,6 @@ jQuery(async () => {
             });
         }
 
-        if ($autoSummaryEnabledCheckbox) {
-            $autoSummaryEnabledCheckbox.on("change", function () {
-                autoSummaryEnabled = jQuery_API(this).prop("checked");
-                try {
-                    localStorage.setItem(
-                        STORAGE_KEY_AUTO_SUMMARY_ENABLED,
-                        autoSummaryEnabled.toString(),
-                    );
-                    logDebug("自动总结开关状态已保存:", autoSummaryEnabled);
-                    showToastr(
-                        "info",
-                        `聊天中自动总结已${autoSummaryEnabled ? "开启" : "关闭"}`,
-                    );
-                } catch (error) {
-                    logError("保存自动总结开关状态失败 (localStorage):", error);
-                }
-            });
-        }
 
         if (
             $worldbookFilterButtonsContainer &&
@@ -3973,17 +3953,15 @@ jQuery(async () => {
             );
             jQuery_API("#extensions_settings2").append(settingsHtml);
 
-            // 绑定设置页面的事件
+            // 绑定浮动按钮开关事件
             const $toggle = jQuery_API("#auto-summary-enabled-toggle");
             if ($toggle.length) {
-                // 加载保存的状态并更新UI
                 const savedState = localStorage.getItem(
                     STORAGE_KEY_FLOATING_BUTTON_ENABLED,
                 );
                 isFloatingButtonEnabled = savedState !== "false";
                 $toggle.prop("checked", isFloatingButtonEnabled);
 
-                // 绑定change事件
                 $toggle.on("change", function () {
                     isFloatingButtonEnabled = jQuery_API(this).is(":checked");
                     localStorage.setItem(
@@ -3997,6 +3975,28 @@ jQuery(async () => {
                         destroyFloatingButton();
                         showToastr("info", "悬浮按钮已禁用。");
                     }
+                });
+            }
+
+            // 绑定自动总结开关事件
+            const $autoToggle = jQuery_API("#auto-summary-auto-enabled-toggle");
+            if ($autoToggle.length) {
+                const savedAutoState = localStorage.getItem(
+                    STORAGE_KEY_AUTO_SUMMARY_ENABLED,
+                );
+                autoSummaryEnabled = savedAutoState !== "false";
+                $autoToggle.prop("checked", autoSummaryEnabled);
+
+                $autoToggle.on("change", function () {
+                    autoSummaryEnabled = jQuery_API(this).is(":checked");
+                    localStorage.setItem(
+                        STORAGE_KEY_AUTO_SUMMARY_ENABLED,
+                        autoSummaryEnabled,
+                    );
+                    showToastr(
+                        "info",
+                        `聊天中自动总结已${autoSummaryEnabled ? "开启" : "关闭"}`,
+                    );
                 });
             }
         } catch (error) {
